@@ -1,4 +1,4 @@
-gradio>=4.44.0
+gradio[mcp]>=4.44.0
 requests>=2.28.0
 pydantic>=2.0.0
 uvicorn>=0.20.0
