@@ -40,23 +40,40 @@ def generate_plan(user_idea):
     }
 
     payload = {
-        "model": "deepseek-ai/DeepSeek-V2",
+        "model": "Qwen/Qwen2.5-72B-Instruct",
         "messages": [
             {
                 "role": "user",
                 "content": master_prompt
             }
-        ]
+        ],
+        "max_tokens": 4000,
+        "temperature": 0.7,
+        "stream": False
     }
 
     try:
         response = requests.post(API_URL, headers=headers, json=payload, timeout=180)
-        response.raise_for_status()
+        
+        # 如果响应不成功，打印详细错误信息
+        if response.status_code != 200:
+            error_detail = f"状态码: {response.status_code}"
+            try:
+                error_json = response.json()
+                error_detail += f", 错误详情: {error_json}"
+            except:
+                error_detail += f", 响应内容: {response.text}"
+            return f"API请求失败: {error_detail}"
+        
         data = response.json()
         generated_content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        
+        if not generated_content:
+            return f"API返回了空内容，完整响应: {data}"
+            
         return generated_content
     except requests.exceptions.RequestException as e:
-        return f"API请求失败: {e}"
+        return f"网络请求失败: {e}"
     except Exception as e:
         return f"处理时发生未知错误: {e}"
 
@@ -66,6 +83,8 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="blue")
         """
         # 🚀 VibeDoc - AI驱动的开发计划生成器
         一键将创意转化为完整的开发方案！参赛魔搭AI Hackathon 2025 (MCP Server开发赛道)。
+        
+        **🔥 MCP Server功能已启用** - 此应用同时提供Web界面和MCP服务器API
         """
     )
     
@@ -82,12 +101,24 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="blue")
     with gr.Row():
         plan_output = gr.Markdown(label="生成的开发计划")
 
+    # 添加MCP API端点
+    @demo.api(name="generate_development_plan")
+    def api_generate_plan(user_idea: str) -> str:
+        """
+        MCP API端点：生成开发计划
+        参数：user_idea - 用户的产品创意
+        返回：生成的开发计划（Markdown格式）
+        """
+        return generate_plan(user_idea)
+
     submit_button.click(
         fn=generate_plan,
         inputs=idea_input,
         outputs=plan_output
     )
 
-# 启动Gradio应用
+# 启动Gradio应用，启用MCP服务器功能
 if __name__ == "__main__":
+    # 设置环境变量以启用MCP服务器
+    os.environ["GRADIO_MCP_SERVER"] = "True"
     demo.launch()
