@@ -3,6 +3,7 @@ import requests
 import os
 import logging
 import json
+import tempfile
 from datetime import datetime
 
 # 配置简洁日志
@@ -41,10 +42,10 @@ def generate_development_plan(user_idea: str, deepwiki_url: str = "") -> str:
         str: 包含开发计划和AI编程提示词的完整方案，采用结构化的Markdown格式
     """
     if not user_idea or not user_idea.strip():
-        return "❌ 请输入您的产品创意！"
+        return "❌ 请输入您的产品创意！", "", ""
         
     if not API_KEY:
-        return "❌ 错误：未配置API密钥"
+        return "❌ 错误：未配置API密钥", "", ""
     
     # 检查并调用相应的MCP服务（智能路由）
     retrieved_knowledge = ""
@@ -57,7 +58,7 @@ def generate_development_plan(user_idea: str, deepwiki_url: str = "") -> str:
             print("--- [LOG] DeepWiki URL provided. Calling DeepWiki MCP... ---")
             
             if not DEEPWIKI_SSE_URL:
-                return "❌ 错误：未配置DEEPWIKI_SSE_URL环境变量"
+                return "❌ 错误：未配置DEEPWIKI_SSE_URL环境变量", "", ""
             
             try:
                 # 构建DeepWiki MCP调用的JSON载荷
@@ -104,7 +105,7 @@ def generate_development_plan(user_idea: str, deepwiki_url: str = "") -> str:
             print("--- [LOG] Generic URL detected. Calling fetch MCP... ---")
             
             if not FETCH_SSE_URL:
-                return "❌ 错误：未配置FETCH_SSE_URL环境变量"
+                return "❌ 错误：未配置FETCH_SSE_URL环境变量", "", ""
             
             try:
                 # 构建fetch MCP调用的JSON载荷
@@ -248,18 +249,43 @@ def generate_development_plan(user_idea: str, deepwiki_url: str = "") -> str:
                     except Exception as e:
                         print(f"--- [LOG] 图像生成错误: {str(e)} ---")
                 
-                return final_plan_text
+                return final_plan_text, extract_prompts_section(final_plan_text), create_temp_markdown_file(final_plan_text)
             else:
-                return "❌ API返回空内容"
+                return "❌ API返回空内容", "", ""
         else:
-            return f"❌ API请求失败: HTTP {response.status_code}"
+            return f"❌ API请求失败: HTTP {response.status_code}", "", ""
             
     except requests.exceptions.Timeout:
-        return "❌ API请求超时，请稍后重试。网络可能较慢，建议检查网络连接。"
+        return "❌ API请求超时，请稍后重试。网络可能较慢，建议检查网络连接。", "", ""
     except requests.exceptions.ConnectionError:
-        return "❌ 网络连接失败，请检查网络设置"
+        return "❌ 网络连接失败，请检查网络设置", "", ""
     except Exception as e:
-        return f"❌ 处理错误: {str(e)}"
+        return f"❌ 处理错误: {str(e)}", "", ""
+
+def extract_prompts_section(content: str) -> str:
+    """从完整内容中提取AI编程提示词部分"""
+    lines = content.split('\n')
+    prompts_section = []
+    in_prompts_section = False
+    
+    for line in lines:
+        if any(keyword in line for keyword in ['编程提示词', '编程助手', 'Prompt', 'AI助手']):
+            in_prompts_section = True
+        if in_prompts_section:
+            prompts_section.append(line)
+    
+    return '\n'.join(prompts_section) if prompts_section else "未找到编程提示词部分"
+
+def create_temp_markdown_file(content: str) -> str:
+    """创建临时markdown文件"""
+    try:
+        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8')
+        temp_file.write(content)
+        temp_file.close()
+        return temp_file.name
+    except Exception as e:
+        print(f"--- [ERROR] 创建临时文件失败: {e} ---")
+        return ""
 
 def format_response(content: str) -> str:
     """格式化AI回复，确保包含编程提示词部分并优化视觉呈现"""
@@ -745,87 +771,19 @@ with gr.Blocks(
     with gr.Column(elem_classes="result-container"):
         plan_output = gr.Markdown(
             value="💭 **AI生成的完整开发计划和编程提示词将在这里显示...**\n\n点击上方按钮开始生成您的专属开发计划和对应的AI编程助手提示词！",
-            elem_id="plan_output_area"
+            elem_id="plan_output_area",
+            label="AI生成的开发计划"
         )
         
-        # 操作按钮 - 使用纯JavaScript避免lambda函数暴露
+        # 隐藏的组件用于复制和下载
+        prompts_for_copy = gr.Textbox(visible=False)
+        download_file = gr.File(label="下载开发计划文档", visible=False)
+        
+        # 新的交互按钮
         with gr.Row():
-            gr.HTML("""
-            <button onclick="copyFullContent()" style="
-                background: #6c757d;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 6px;
-                cursor: pointer;
-                margin: 5px;
-                font-size: 14px;
-            ">📋 复制完整内容</button>
-            
-            <button onclick="copyPrompts()" style="
-                background: #28a745;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 6px;
-                cursor: pointer;
-                margin: 5px;
-                font-size: 14px;
-            ">🤖 复制编程提示词</button>
-            
-            <script>
-            function copyFullContent() {
-                const planResult = document.getElementById('plan_result');
-                if (planResult) {
-                    const content = planResult.innerText || planResult.textContent;
-                    if (content && !content.includes('AI生成的完整开发计划和编程提示词将在这里显示')) {
-                        navigator.clipboard.writeText(content).then(function() {
-                            alert('✅ 完整内容已复制到剪贴板！');
-                        }).catch(function(err) {
-                            alert('❌ 复制失败，请手动复制');
-                        });
-                    } else {
-                        alert('⚠️ 请先生成开发计划');
-                    }
-                }
-            }
-            
-            function copyPrompts() {
-                const planResult = document.getElementById('plan_result');
-                if (planResult) {
-                    const content = planResult.innerText || planResult.textContent;
-                    if (content && !content.includes('AI生成的完整开发计划和编程提示词将在这里显示')) {
-                        const lines = content.split('\\n');
-                        let promptsSection = [];
-                        let inPromptsSection = false;
-                        
-                        for (let line of lines) {
-                            if (line.includes('编程提示词') || line.includes('编程助手') || line.includes('Prompt')) {
-                                inPromptsSection = true;
-                            }
-                            if (inPromptsSection) {
-                                promptsSection.push(line);
-                            }
-                        }
-                        
-                        const promptsText = promptsSection.join('\\n');
-                        if (promptsText.trim()) {
-                            navigator.clipboard.writeText(promptsText).then(function() {
-                                alert('🤖 AI编程提示词已复制到剪贴板！\\n\\n可以直接粘贴到Claude Code、GitHub Copilot等AI编程工具中使用。');
-                            }).catch(function(err) {
-                                alert('❌ 复制失败，请手动复制编程提示词部分');
-                            });
-                        } else {
-                            alert('⚠️ 未找到编程提示词部分，请检查生成的内容');
-                        }
-                    } else {
-                        alert('⚠️ 请先生成开发计划');
-                    }
-                }
-            }
-            </script>
-            """)
-    
+            copy_full_button = gr.Button("📋 复制完整内容", variant="secondary")
+            copy_prompts_button = gr.Button("🤖 复制编程提示词", variant="secondary")
+        
     # 示例区域
     gr.Markdown("## 🎯 快速开始示例", elem_id="quick_start_container")
     gr.Examples(
@@ -855,12 +813,45 @@ with gr.Blocks(
     </div>
     """)
     
+    # MCP测试部分
+    with gr.Accordion("🔧 如何通过API或MCP使用本工具", open=False):
+        gr.Code(
+            value="""# 将 YOUR_APP_URL 替换为您的创空间URL, 比如 https://jasonrobert-vibedocs.modelscope.cn
+# 将 YOUR_IDEA 替换为您的产品创意
+curl -X POST YOUR_APP_URL/api/generate_plan -H "Content-Type: application/json" -d '{"data": ["YOUR_IDEA"]}'""",
+            language="shell",
+            label="MCP API调用示例"
+        )
+        gr.Markdown("""
+**使用说明：**
+1. 将 `YOUR_APP_URL` 替换为您的创空间实际URL
+2. 将 `YOUR_IDEA` 替换为您的产品创意描述  
+3. 在终端或命令行中执行此命令即可获得JSON格式的开发计划
+4. 此API也可以被其他MCP客户端调用，实现自动化开发计划生成
+        """)
+    
     # 绑定事件 - 只有主函数使用api_name
     generate_btn.click(
         fn=generate_development_plan,
         inputs=[idea_input, deepwiki_url_input],
-        outputs=[plan_output],
+        outputs=[plan_output, prompts_for_copy, download_file],
         api_name="generate_plan"  # 确保MCP只识别主函数
+    ).then(
+        fn=lambda: gr.update(visible=True),
+        outputs=[download_file]
+    )
+    
+    # 复制按钮事件
+    copy_full_button.click(
+        fn=None,
+        _js="(text) => { navigator.clipboard.writeText(text); alert('✅ 完整内容已复制到剪贴板！'); }",
+        inputs=[plan_output]
+    )
+    
+    copy_prompts_button.click(
+        fn=None,
+        _js="(text) => { navigator.clipboard.writeText(text); alert('🤖 AI编程提示词已复制到剪贴板！\\n\\n可以直接粘贴到Claude Code、GitHub Copilot等AI编程工具中使用。'); }",
+        inputs=[prompts_for_copy]
     )
 
 # 学习您工作项目的简单直接启动方式
