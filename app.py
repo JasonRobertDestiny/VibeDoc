@@ -89,33 +89,13 @@ def generate_development_plan(user_idea: str) -> str:
     except Exception as e:
         return f"❌ 处理错误: {str(e)}"
 
-def copy_to_clipboard(text):
-    """复制文本到剪贴板的JavaScript函数"""
-    return f"""
-    <script>
-    function copyToClipboard() {{
-        const text = `{text.replace('`', '\\`')}`;
-        navigator.clipboard.writeText(text).then(function() {{
-            alert('✅ 已复制到剪贴板！');
-        }}, function(err) {{
-            console.error('复制失败: ', err);
-            alert('❌ 复制失败，请手动复制');
-        }});
-    }}
-    copyToClipboard();
-    </script>
-    """
-
 def download_as_file(content, filename, format_type):
     """生成下载链接"""
     if format_type == "markdown":
-        content_type = "text/markdown"
         extension = ".md"
     elif format_type == "txt":
-        content_type = "text/plain"
         extension = ".txt"
     elif format_type == "json":
-        content_type = "application/json"
         extension = ".json"
         # 将markdown转为JSON格式
         content = json.dumps({"title": filename, "content": content, "created_at": datetime.now().isoformat()}, ensure_ascii=False, indent=2)
@@ -159,37 +139,6 @@ custom_css = """
     padding: 20px;
     margin: 20px 0;
     border-left: 4px solid #007bff;
-}
-
-.action-buttons {
-    display: flex;
-    gap: 10px;
-    margin-top: 15px;
-    flex-wrap: wrap;
-}
-
-.btn-copy {
-    background: #28a745;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.btn-download {
-    background: #007bff;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.btn-copy:hover, .btn-download:hover {
-    opacity: 0.8;
 }
 
 .generate-btn {
@@ -237,9 +186,6 @@ with gr.Blocks(
     theme=gr.themes.Soft(primary_hue="blue"),
     css=custom_css
 ) as demo:
-    
-    # 设置MCP服务器环境变量
-    os.environ["GRADIO_MCP_SERVER"] = "True"
     
     gr.HTML("""
     <div class="header-gradient">
@@ -322,18 +268,6 @@ with gr.Blocks(
         result = generate_development_plan(user_idea)
         return result
     
-    def handle_copy(plan_content):
-        if plan_content and "AI生成的完整开发计划将在这里显示" not in plan_content:
-            # 使用JavaScript复制到剪贴板
-            return gr.update(), gr.HTML("""
-            <script>
-            navigator.clipboard.writeText(`""" + plan_content.replace('`', '\\`').replace('\n', '\\n') + """`).then(function() {
-                alert('✅ 内容已复制到剪贴板！');
-            });
-            </script>
-            """)
-        return gr.update(), gr.update()
-    
     def handle_download(plan_content, format_type):
         if plan_content and "AI生成的完整开发计划将在这里显示" not in plan_content:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -396,21 +330,19 @@ with gr.Blocks(
 
 # 启动应用
 if __name__ == "__main__":
-    # 设置环境变量启用MCP
-    os.environ["GRADIO_MCP_SERVER"] = "True"
-    
     # 检测运行环境
     is_modelscope = "MODELSCOPE" in os.environ or os.environ.get("MODELSCOPE_ENVIRONMENT") == "studio"
     
     try:
         if is_modelscope:
-            # ModelScope环境
+            # ModelScope环境：启用MCP Server模式
             demo.launch(
                 server_name="0.0.0.0",
                 server_port=7860,
                 share=False,
                 quiet=True,
                 show_error=False,
+                mcp_server=True,
                 max_threads=4
             )
         else:
@@ -418,12 +350,13 @@ if __name__ == "__main__":
             demo.launch(
                 server_name="127.0.0.1",
                 server_port=7860,
-                share=True
+                share=True,
+                mcp_server=True
             )
             
     except Exception as e:
         logger.error(f"启动失败: {e}")
-        # 降级启动
+        # 降级启动（不使用MCP）
         demo.launch(
             server_name="0.0.0.0",
             server_port=7860,
