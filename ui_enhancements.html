@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VibeDoc - AI开发计划生成器</title>
+    <style>
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        
+        .loading-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .feature-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .feature-icon {
+            font-size: 2.5em;
+            margin-bottom: 15px;
+        }
+        
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #555;
+            color: white;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.success {
+            background: #28a745;
+        }
+        
+        .notification.error {
+            background: #dc3545;
+        }
+        
+        .notification.info {
+            background: #17a2b8;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        // 加载状态管理
+        function showLoading(message = '正在生成开发计划...') {
+            const overlay = document.createElement('div');
+            overlay.className = 'loading-overlay';
+            overlay.id = 'loading-overlay';
+            overlay.innerHTML = `
+                <div class="loading-content">
+                    <div class="loading-spinner"></div>
+                    <h3>${message}</h3>
+                    <p>AI正在分析您的创意，请稍候...</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            
+            // 模拟进度条
+            let progress = 0;
+            const progressBar = overlay.querySelector('.progress-fill');
+            const interval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress > 90) progress = 90;
+                progressBar.style.width = progress + '%';
+            }, 800);
+            
+            overlay.progressInterval = interval;
+        }
+        
+        function hideLoading() {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                if (overlay.progressInterval) {
+                    clearInterval(overlay.progressInterval);
+                }
+                overlay.remove();
+            }
+        }
+        
+        // 通知系统
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // 显示通知
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+            
+            // 自动隐藏
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 3000);
+        }
+        
+        // 表单验证
+        function validateForm(idea, url) {
+            if (!idea || idea.trim().length < 10) {
+                showNotification('请输入至少10个字符的产品创意描述', 'error');
+                return false;
+            }
+            
+            if (url && url.trim()) {
+                try {
+                    new URL(url.trim());
+                } catch (e) {
+                    showNotification('请输入有效的URL格式', 'error');
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+        
+        // 复制功能优化
+        function copyToClipboard(text, successMessage = '已复制到剪贴板') {
+            navigator.clipboard.writeText(text).then(() => {
+                showNotification(successMessage, 'success');
+            }).catch(() => {
+                showNotification('复制失败，请手动选择文本', 'error');
+            });
+        }
+        
+        // 键盘快捷键
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+Enter 快速生成
+            if (e.ctrlKey && e.key === 'Enter') {
+                const generateBtn = document.querySelector('.generate-btn');
+                if (generateBtn) {
+                    generateBtn.click();
+                }
+            }
+            
+            // Ctrl+C 复制完整内容
+            if (e.ctrlKey && e.key === 'c' && e.shiftKey) {
+                const copyBtn = document.querySelector('#copy_full_button');
+                if (copyBtn) {
+                    copyBtn.click();
+                }
+            }
+        });
+        
+        // 自动保存功能
+        function autoSave() {
+            const ideaInput = document.querySelector('#idea_input');
+            const urlInput = document.querySelector('#reference_url_input');
+            
+            if (ideaInput && urlInput) {
+                const data = {
+                    idea: ideaInput.value,
+                    url: urlInput.value,
+                    timestamp: new Date().toISOString()
+                };
+                localStorage.setItem('vibedoc_autosave', JSON.stringify(data));
+            }
+        }
+        
+        // 恢复自动保存的数据
+        function loadAutoSave() {
+            const saved = localStorage.getItem('vibedoc_autosave');
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    const ideaInput = document.querySelector('#idea_input');
+                    const urlInput = document.querySelector('#reference_url_input');
+                    
+                    if (ideaInput && data.idea) {
+                        ideaInput.value = data.idea;
+                    }
+                    if (urlInput && data.url) {
+                        urlInput.value = data.url;
+                    }
+                    
+                    showNotification('已恢复上次保存的内容', 'info');
+                } catch (e) {
+                    console.error('Failed to load autosave data:', e);
+                }
+            }
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 加载自动保存的数据
+            setTimeout(loadAutoSave, 1000);
+            
+            // 设置自动保存
+            const inputs = document.querySelectorAll('input[type="text"], textarea');
+            inputs.forEach(input => {
+                input.addEventListener('input', autoSave);
+            });
+            
+            // 添加工具提示
+            const tooltips = document.querySelectorAll('.tooltip');
+            tooltips.forEach(tooltip => {
+                tooltip.addEventListener('mouseenter', function() {
+                    this.querySelector('.tooltiptext').style.visibility = 'visible';
+                    this.querySelector('.tooltiptext').style.opacity = '1';
+                });
+                
+                tooltip.addEventListener('mouseleave', function() {
+                    this.querySelector('.tooltiptext').style.visibility = 'hidden';
+                    this.querySelector('.tooltiptext').style.opacity = '0';
+                });
+            });
+            
+            // 添加滚动到顶部按钮
+            const scrollBtn = document.createElement('button');
+            scrollBtn.innerHTML = '↑';
+            scrollBtn.className = 'scroll-to-top';
+            scrollBtn.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                background: #007bff;
+                color: white;
+                border: none;
+                font-size: 20px;
+                cursor: pointer;
+                display: none;
+                z-index: 1000;
+                transition: all 0.3s ease;
+            `;
+            document.body.appendChild(scrollBtn);
+            
+            // 滚动监听
+            window.addEventListener('scroll', function() {
+                if (window.scrollY > 300) {
+                    scrollBtn.style.display = 'block';
+                } else {
+                    scrollBtn.style.display = 'none';
+                }
+            });
+            
+            scrollBtn.addEventListener('click', function() {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            });
+        });
+        
+        // 导出功能
+        function exportToHTML(content) {
+            const blob = new Blob([content], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vibedoc-plan-${new Date().toISOString().split('T')[0]}.html`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        function exportToPDF() {
+            if (window.jsPDF) {
+                const doc = new jsPDF();
+                const content = document.querySelector('#plan_output_area').textContent;
+                doc.text(content, 10, 10);
+                doc.save(`vibedoc-plan-${new Date().toISOString().split('T')[0]}.pdf`);
+            } else {
+                showNotification('PDF导出功能需要额外的库支持', 'error');
+            }
+        }
+        
+        // 分享功能
+        function shareToSocial(platform, content) {
+            const text = encodeURIComponent(content.substring(0, 280));
+            const url = encodeURIComponent(window.location.href);
+            
+            let shareUrl = '';
+            switch (platform) {
+                case 'twitter':
+                    shareUrl = `https://twitter.com/intent/tweet?text=${text}&url=${url}`;
+                    break;
+                case 'linkedin':
+                    shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${url}`;
+                    break;
+                case 'facebook':
+                    shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
+                    break;
+            }
+            
+            if (shareUrl) {
+                window.open(shareUrl, '_blank', 'width=600,height=400');
+            }
+        }
+    </script>
+</body>
+</html>

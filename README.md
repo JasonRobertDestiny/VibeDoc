@@ -28,7 +28,7 @@ short_description: 🔥 一键将创意转化为完整开发方案！AI驱动的
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
 [![MCP Server](https://img.shields.io/badge/MCP-Server-green)](https://modelscope.cn)
 
-> 🏆 **参赛项目** - 魔塔MCP&Agent挑战赛2025 - 赛道二：Agent应用开发赛道
+> 🏆 **参赛项目** - 魔塔MCP&Agent挑战赛2025 - Agent应用开发赛道
 
 </div>
 

@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  vibedoc:
+    build: .
+    container_name: vibedoc-app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY}
+      - DEEPWIKI_SSE_URL=${DEEPWIKI_SSE_URL}
+      - FETCH_SSE_URL=${FETCH_SSE_URL}
+      - DOUBAO_SSE_URL=${DOUBAO_SSE_URL}
+      - DOUBAO_API_KEY=${DOUBAO_API_KEY}
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - vibedoc-network
+
+  # 可选：Redis缓存服务
+  redis:
+    image: redis:7-alpine
+    container_name: vibedoc-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - vibedoc-network
+
+  # 可选：Nginx反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: vibedoc-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - vibedoc
+    restart: unless-stopped
+    networks:
+      - vibedoc-network
+
+volumes:
+  redis-data:
+
+networks:
+  vibedoc-network:
+    driver: bridge

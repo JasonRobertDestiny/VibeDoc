@@ -5,13 +5,18 @@ import logging
 import json
 import tempfile
 from datetime import datetime
+from typing import Optional, Tuple, Dict, Any
+from urllib.parse import urlparse
 
-# 配置简洁日志
-logging.basicConfig(level=logging.WARNING)
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-# API配置
-API_KEY = os.environ.get("SILICONFLOW_API_KEY", "sk-eeqxcykxvmomeunmpbbgdsqgvrxqksyapauxzexphsiflgsy")
+# API配置 - 仅使用环境变量
+API_KEY = os.environ.get("SILICONFLOW_API_KEY")
 API_URL = "https://api.siliconflow.cn/v1/chat/completions"
 DEEPWIKI_SSE_URL = os.environ.get("DEEPWIKI_SSE_URL")
 FETCH_SSE_URL = os.environ.get("FETCH_SSE_URL")
@@ -20,133 +25,199 @@ DOUBAO_API_KEY = os.environ.get("DOUBAO_API_KEY")
 
 # 设置Doubao API Key（应用启动时）
 if DOUBAO_SSE_URL and DOUBAO_API_KEY:
-    print("--- [LOG] Setting Doubao API Key on startup... ---")
+    logger.info("Setting Doubao API Key on startup...")
     try:
         requests.post(
             DOUBAO_SSE_URL,
             json={"action": "set_api_key", "params": {"api_key": DOUBAO_API_KEY}},
             timeout=10
         )
+        logger.info("Doubao API Key set successfully")
     except Exception as e:
-        print(f"--- [ERROR] Failed to set Doubao API Key on startup: {e} ---")
+        logger.error(f"Failed to set Doubao API Key: {e}")
 
-def generate_development_plan(user_idea: str, deepwiki_url: str = "") -> str:
+def validate_input(user_idea: str) -> Tuple[bool, str]:
+    """验证用户输入"""
+    if not user_idea or not user_idea.strip():
+        return False, "❌ 请输入您的产品创意！"
+    
+    if len(user_idea.strip()) < 10:
+        return False, "❌ 产品创意描述太短，请提供更详细的信息"
+    
+    return True, ""
+
+def validate_url(url: str) -> bool:
+    """验证URL格式"""
+    try:
+        result = urlparse(url)
+        return all([result.scheme, result.netloc])
+    except Exception:
+        return False
+
+def call_mcp_service(url: str, payload: Dict[str, Any], service_name: str, timeout: int = 30) -> Tuple[bool, str]:
+    """统一的MCP服务调用函数
+    
+    Args:
+        url: MCP服务URL
+        payload: 请求载荷
+        service_name: 服务名称（用于日志）
+        timeout: 超时时间
+        
+    Returns:
+        (success, data): 成功标志和返回数据
+    """
+    try:
+        logger.info(f"Calling {service_name} MCP service...")
+        
+        response = requests.post(
+            url,
+            headers={"Content-Type": "application/json"},
+            json=payload,
+            timeout=timeout
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "data" in data and data["data"]:
+                content = data["data"]
+                logger.info(f"{service_name} MCP service returned {len(content)} characters")
+                return True, content
+            else:
+                logger.warning(f"{service_name} MCP service returned empty data")
+                return False, f"❌ {service_name} MCP返回空数据"
+        else:
+            logger.error(f"{service_name} MCP service failed with status {response.status_code}")
+            return False, f"❌ {service_name} MCP调用失败: HTTP {response.status_code}"
+            
+    except requests.exceptions.Timeout:
+        logger.error(f"{service_name} MCP service timeout")
+        return False, f"❌ {service_name} MCP调用超时"
+    except requests.exceptions.ConnectionError:
+        logger.error(f"{service_name} MCP service connection failed")
+        return False, f"❌ {service_name} MCP连接失败"
+    except Exception as e:
+        logger.error(f"{service_name} MCP service error: {str(e)}")
+        return False, f"❌ {service_name} MCP调用错误: {str(e)}"
+
+def fetch_external_knowledge(reference_url: str) -> str:
+    """获取外部知识库内容"""
+    if not reference_url or not reference_url.strip():
+        return ""
+    
+    url = reference_url.strip()
+    
+    # 验证URL格式
+    if not validate_url(url):
+        logger.warning(f"Invalid URL format: {url}")
+        return "❌ 无效的URL格式"
+    
+    # 智能路由：根据URL类型选择不同的MCP服务
+    if "deepwiki.org" in url:
+        if not DEEPWIKI_SSE_URL:
+            logger.error("DEEPWIKI_SSE_URL not configured")
+            return "❌ DeepWiki服务未配置"
+        
+        payload = {
+            "action": "deepwiki_fetch",
+            "params": {
+                "url": url,
+                "mode": "aggregate"
+            }
+        }
+        
+        success, knowledge = call_mcp_service(DEEPWIKI_SSE_URL, payload, "DeepWiki")
+        return knowledge
+    
+    else:
+        if not FETCH_SSE_URL:
+            logger.error("FETCH_SSE_URL not configured")
+            return "❌ Fetch服务未配置"
+        
+        payload = {
+            "action": "fetch",
+            "params": {
+                "url": url
+            }
+        }
+        
+        success, knowledge = call_mcp_service(FETCH_SSE_URL, payload, "Fetch")
+        return knowledge
+
+def generate_concept_logo(user_idea: str) -> str:
+    """生成概念LOGO"""
+    if not DOUBAO_SSE_URL or not DOUBAO_API_KEY:
+        return ""
+    
+    try:
+        logger.info("Generating concept logo with Doubao...")
+        
+        # 创建图像提示词
+        image_prompt = f"Logo for a new app: {user_idea}, minimalist, vector art, clean background"
+        
+        # 构建Doubao text_to_image调用的JSON载荷
+        image_payload = {
+            "action": "text_to_image",
+            "params": {
+                "prompt": image_prompt,
+                "size": "1024x1024"
+            }
+        }
+        
+        # 调用Doubao text_to_image
+        image_response = requests.post(
+            DOUBAO_SSE_URL,
+            json=image_payload,
+            timeout=30
+        )
+        
+        if image_response.status_code == 200:
+            image_data = image_response.json()
+            # 解析图像URL（根据实际响应格式调整）
+            if "result" in image_data and image_data["result"] and len(image_data["result"]) > 0:
+                image_url = image_data["result"][0].get("url", "")
+                if image_url:
+                    logger.info("Concept logo generated successfully")
+                    return f"\n\n---\n\n## 🎨 概念LOGO\n![Concept Logo]({image_url})"
+                else:
+                    logger.warning("No image URL found in response")
+            else:
+                logger.warning("Invalid image generation response format")
+        else:
+            logger.error(f"Image generation failed: HTTP {image_response.status_code}")
+            
+    except requests.exceptions.Timeout:
+        logger.error("Image generation timeout")
+    except requests.exceptions.ConnectionError:
+        logger.error("Image generation connection failed")
+    except Exception as e:
+        logger.error(f"Image generation error: {str(e)}")
+    
+    return ""
+
+def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[str, str, str]:
     """
     基于用户创意生成完整的产品开发计划和对应的AI编程助手提示词。
     
     Args:
-        user_idea (str): 用户的产品创意描述，可以是任何类型的应用或服务想法
-        deepwiki_url (str): 可选的DeepWiki文档链接，用于获取外部知识库参考
+        user_idea (str): 用户的产品创意描述
+        reference_url (str): 可选的参考链接
         
     Returns:
-        str: 包含开发计划和AI编程提示词的完整方案，采用结构化的Markdown格式
+        Tuple[str, str, str]: 开发计划、AI编程提示词、临时文件路径
     """
-    if not user_idea or not user_idea.strip():
-        return "❌ 请输入您的产品创意！", "", ""
+    # 验证输入
+    is_valid, error_msg = validate_input(user_idea)
+    if not is_valid:
+        return error_msg, "", ""
         
     if not API_KEY:
+        logger.error("API key not configured")
         return "❌ 错误：未配置API密钥", "", ""
     
-    # 检查并调用相应的MCP服务（智能路由）
-    retrieved_knowledge = ""
-    if deepwiki_url and deepwiki_url.strip():
-        url = deepwiki_url.strip()
-        
-        # 智能路由：根据URL类型选择不同的MCP服务
-        if "deepwiki.org" in url:
-            # 调用DeepWiki MCP服务
-            print("--- [LOG] DeepWiki URL provided. Calling DeepWiki MCP... ---")
-            
-            if not DEEPWIKI_SSE_URL:
-                return "❌ 错误：未配置DEEPWIKI_SSE_URL环境变量", "", ""
-            
-            try:
-                # 构建DeepWiki MCP调用的JSON载荷
-                deepwiki_payload = {
-                    "action": "deepwiki_fetch",
-                    "params": {
-                        "url": url,
-                        "mode": "aggregate"
-                    }
-                }
-                
-                # 调用DeepWiki MCP
-                deepwiki_response = requests.post(
-                    DEEPWIKI_SSE_URL,
-                    headers={"Content-Type": "application/json"},
-                    json=deepwiki_payload,
-                    timeout=30
-                )
-                
-                if deepwiki_response.status_code == 200:
-                    deepwiki_data = deepwiki_response.json()
-                    if "data" in deepwiki_data and deepwiki_data["data"]:
-                        retrieved_knowledge = deepwiki_data["data"]
-                        print(f"--- [LOG] DeepWiki MCP成功获取知识，长度: {len(retrieved_knowledge)} 字符 ---")
-                    else:
-                        retrieved_knowledge = "❌ DeepWiki MCP返回空数据"
-                        print("--- [LOG] DeepWiki MCP返回空数据 ---")
-                else:
-                    retrieved_knowledge = f"❌ DeepWiki MCP调用失败: HTTP {deepwiki_response.status_code}"
-                    print(f"--- [LOG] DeepWiki MCP调用失败: {deepwiki_response.status_code} ---")
-                    
-            except requests.exceptions.Timeout:
-                retrieved_knowledge = "❌ DeepWiki MCP调用超时"
-                print("--- [LOG] DeepWiki MCP调用超时 ---")
-            except requests.exceptions.ConnectionError:
-                retrieved_knowledge = "❌ DeepWiki MCP连接失败"
-                print("--- [LOG] DeepWiki MCP连接失败 ---")
-            except Exception as e:
-                retrieved_knowledge = f"❌ DeepWiki MCP调用错误: {str(e)}"
-                print(f"--- [LOG] DeepWiki MCP调用错误: {str(e)} ---")
-        
-        else:
-            # 调用通用fetch MCP服务
-            print("--- [LOG] Generic URL detected. Calling fetch MCP... ---")
-            
-            if not FETCH_SSE_URL:
-                return "❌ 错误：未配置FETCH_SSE_URL环境变量", "", ""
-            
-            try:
-                # 构建fetch MCP调用的JSON载荷
-                fetch_payload = {
-                    "action": "fetch",
-                    "params": {
-                        "url": url
-                    }
-                }
-                
-                # 调用fetch MCP
-                fetch_response = requests.post(
-                    FETCH_SSE_URL,
-                    headers={"Content-Type": "application/json"},
-                    json=fetch_payload,
-                    timeout=30
-                )
-                
-                if fetch_response.status_code == 200:
-                    fetch_data = fetch_response.json()
-                    if "data" in fetch_data and fetch_data["data"]:
-                        retrieved_knowledge = fetch_data["data"]
-                        print(f"--- [LOG] fetch MCP成功获取知识，长度: {len(retrieved_knowledge)} 字符 ---")
-                    else:
-                        retrieved_knowledge = "❌ fetch MCP返回空数据"
-                        print("--- [LOG] fetch MCP返回空数据 ---")
-                else:
-                    retrieved_knowledge = f"❌ fetch MCP调用失败: HTTP {fetch_response.status_code}"
-                    print(f"--- [LOG] fetch MCP调用失败: {fetch_response.status_code} ---")
-                    
-            except requests.exceptions.Timeout:
-                retrieved_knowledge = "❌ fetch MCP调用超时"
-                print("--- [LOG] fetch MCP调用超时 ---")
-            except requests.exceptions.ConnectionError:
-                retrieved_knowledge = "❌ fetch MCP连接失败"
-                print("--- [LOG] fetch MCP连接失败 ---")
-            except Exception as e:
-                retrieved_knowledge = f"❌ fetch MCP调用错误: {str(e)}"
-                print(f"--- [LOG] fetch MCP调用错误: {str(e)} ---")
-
-    # 使用二段式提示词，生成开发计划和编程提示词
+    # 获取外部知识库内容
+    retrieved_knowledge = fetch_external_knowledge(reference_url)
+    
+    # 构建系统提示词
     system_prompt = """你是一个资深技术项目经理，精通产品规划和 AI 编程助手（如 GitHub Copilot、ChatGPT Code）提示词撰写。当收到一个产品创意时，你要：
 
 1. 生成一个详细的开发计划（Markdown 格式，包含功能、技术栈、时间节点等）
@@ -158,14 +229,14 @@ def generate_development_plan(user_idea: str, deepwiki_url: str = "") -> str:
 
 格式要求：先输出开发计划，然后输出编程提示词部分。"""
 
-    # 构建用户提示词，如果有外部知识则注入
+    # 构建用户提示词
     user_prompt = f"""产品创意：{user_idea}"""
     
     # 如果成功获取到外部知识，则注入到提示词中
     if retrieved_knowledge and not retrieved_knowledge.startswith("❌"):
         user_prompt += f"""
 
-# 外部知识库参考 (DeepWiki)
+# 外部知识库参考
 {retrieved_knowledge}
 
 请基于上述外部知识库参考和产品创意生成："""
@@ -181,6 +252,8 @@ def generate_development_plan(user_idea: str, deepwiki_url: str = "") -> str:
 确保提示词具体、可操作，能直接用于AI编程工具。"""
 
     try:
+        logger.info("Calling AI API for development plan generation...")
+        
         response = requests.post(
             API_URL,
             headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
@@ -190,7 +263,7 @@ def generate_development_plan(user_idea: str, deepwiki_url: str = "") -> str:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                "max_tokens": 4000,  # 增加token数以容纳更多内容
+                "max_tokens": 4000,
                 "temperature": 0.7
             },
             timeout=120
@@ -203,63 +276,29 @@ def generate_development_plan(user_idea: str, deepwiki_url: str = "") -> str:
                 final_plan_text = format_response(content)
                 
                 # 生成概念LOGO图像
-                if DOUBAO_SSE_URL and DOUBAO_API_KEY:
-                    print("--- [LOG] Generating concept logo with Doubao... ---")
-                    try:
-                        # 创建图像提示词
-                        image_prompt = f"Logo for a new app: {user_idea}, minimalist, vector art, clean background"
-                        
-                        # 构建Doubao text_to_image调用的JSON载荷
-                        image_payload = {
-                            "action": "text_to_image",
-                            "params": {
-                                "prompt": image_prompt,
-                                "size": "1024x1024"
-                            }
-                        }
-                        
-                        # 调用Doubao text_to_image
-                        image_response = requests.post(
-                            DOUBAO_SSE_URL,
-                            json=image_payload,
-                            timeout=30
-                        )
-                        
-                        if image_response.status_code == 200:
-                            image_data = image_response.json()
-                            # 解析图像URL（根据实际响应格式调整）
-                            if "result" in image_data and image_data["result"] and len(image_data["result"]) > 0:
-                                image_url = image_data["result"][0].get("url", "")
-                                if image_url:
-                                    # 添加图像到计划中
-                                    image_markdown = f"\n\n---\n\n## 🎨 概念LOGO\n![Concept Logo]({image_url})"
-                                    final_plan_text += image_markdown
-                                    print(f"--- [LOG] 成功生成概念LOGO图像 ---")
-                                else:
-                                    print("--- [LOG] 图像生成响应中未找到URL ---")
-                            else:
-                                print("--- [LOG] 图像生成响应格式不正确 ---")
-                        else:
-                            print(f"--- [LOG] 图像生成失败: HTTP {image_response.status_code} ---")
-                            
-                    except requests.exceptions.Timeout:
-                        print("--- [LOG] 图像生成超时 ---")
-                    except requests.exceptions.ConnectionError:
-                        print("--- [LOG] 图像生成连接失败 ---")
-                    except Exception as e:
-                        print(f"--- [LOG] 图像生成错误: {str(e)} ---")
+                logo_content = generate_concept_logo(user_idea)
+                if logo_content:
+                    final_plan_text += logo_content
                 
-                return final_plan_text, extract_prompts_section(final_plan_text), create_temp_markdown_file(final_plan_text)
+                # 创建临时文件
+                temp_file = create_temp_markdown_file(final_plan_text)
+                
+                return final_plan_text, extract_prompts_section(final_plan_text), temp_file
             else:
+                logger.error("API returned empty content")
                 return "❌ API返回空内容", "", ""
         else:
+            logger.error(f"API request failed with status {response.status_code}")
             return f"❌ API请求失败: HTTP {response.status_code}", "", ""
             
     except requests.exceptions.Timeout:
-        return "❌ API请求超时，请稍后重试。网络可能较慢，建议检查网络连接。", "", ""
+        logger.error("API request timeout")
+        return "❌ API请求超时，请稍后重试", "", ""
     except requests.exceptions.ConnectionError:
+        logger.error("API connection failed")
         return "❌ 网络连接失败，请检查网络设置", "", ""
     except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
         return f"❌ 处理错误: {str(e)}", "", ""
 
 def extract_prompts_section(content: str) -> str:
@@ -282,16 +321,16 @@ def create_temp_markdown_file(content: str) -> str:
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8')
         temp_file.write(content)
         temp_file.close()
+        logger.info(f"Created temporary file: {temp_file.name}")
         return temp_file.name
     except Exception as e:
-        print(f"--- [ERROR] 创建临时文件失败: {e} ---")
+        logger.error(f"Failed to create temporary file: {e}")
         return ""
 
 def format_response(content: str) -> str:
     """格式化AI回复，确保包含编程提示词部分并优化视觉呈现"""
     
     # 添加时间戳和格式化标题
-    from datetime import datetime
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     # 在内容开头添加生成信息
@@ -663,33 +702,33 @@ custom_css = """
 
 /* Fix for quick start text contrast */
 #quick_start_container p {
-    color: #4A5568; /* A medium-dark gray for light mode */
+    color: #4A5568;
 }
 
 .dark #quick_start_container p {
-    color: #E2E8F0; /* A light gray for dark mode */
+    color: #E2E8F0;
 }
 
 /* Improve placeholder text contrast in dark mode */
 .dark #plan_output_area textarea::placeholder {
-    color: #9CA3AF !important; /* A slightly darker gray */
+    color: #9CA3AF !important;
 }
 
 /* Improve AI helper text contrast in dark mode */
 .dark #ai_helper_instructions {
-    color: #CBD5E0 !important; /* A light gray */
+    color: #CBD5E0 !important;
 }
 
 .dark #ai_helper_instructions p {
-    color: #E2E8F0 !important; /* Even lighter for better contrast */
+    color: #E2E8F0 !important;
 }
 
 .dark #ai_helper_instructions li {
-    color: #E2E8F0 !important; /* Consistent light color for list items */
+    color: #E2E8F0 !important;
 }
 
 .dark #ai_helper_instructions strong {
-    color: #F7FAFC !important; /* Very light for emphasis */
+    color: #F7FAFC !important;
 }
 
 /* Improve plan output placeholder text contrast in dark mode */
@@ -699,6 +738,23 @@ custom_css = """
 
 .dark #plan_output_area p {
     color: #E2E8F0 !important;
+}
+
+/* Loading spinner */
+.loading-spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #007bff;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 """
 
@@ -733,7 +789,7 @@ with gr.Blocks(
                 show_label=False
             )
             
-            deepwiki_url_input = gr.Textbox(
+            reference_url_input = gr.Textbox(
                 label="参考链接 (可选)",
                 placeholder="输入任何网页链接（如博客、新闻、文档）作为参考...",
                 lines=1,
@@ -763,6 +819,7 @@ with gr.Blocks(
                     <li>📋 完整开发计划</li>
                     <li>🤖 AI编程助手提示词</li>
                     <li>📝 可直接用于编程工具</li>
+                    <li>🔗 智能参考链接解析</li>
                 </ul>
             </div>
             """)
@@ -830,12 +887,12 @@ curl -X POST YOUR_APP_URL/api/generate_plan -H "Content-Type: application/json" 
 4. 此API也可以被其他MCP客户端调用，实现自动化开发计划生成
         """)
     
-    # 绑定事件 - 只有主函数使用api_name
+    # 绑定事件
     generate_btn.click(
         fn=generate_development_plan,
-        inputs=[idea_input, deepwiki_url_input],
+        inputs=[idea_input, reference_url_input],
         outputs=[plan_output, prompts_for_copy, download_file],
-        api_name="generate_plan"  # 确保MCP只识别主函数
+        api_name="generate_plan"
     ).then(
         fn=lambda: gr.update(visible=True),
         outputs=[download_file]
@@ -854,5 +911,6 @@ curl -X POST YOUR_APP_URL/api/generate_plan -H "Content-Type: application/json" 
         inputs=[prompts_for_copy]
     )
 
-# 学习您工作项目的简单直接启动方式
-demo.launch(mcp_server=True)
+# 启动应用
+if __name__ == "__main__":
+    demo.launch(mcp_server=True)
