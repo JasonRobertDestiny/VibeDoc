@@ -653,6 +653,27 @@ custom_css = """
 .dark #ai_helper_instructions {
     color: #CBD5E0 !important; /* A light gray */
 }
+
+.dark #ai_helper_instructions p {
+    color: #E2E8F0 !important; /* Even lighter for better contrast */
+}
+
+.dark #ai_helper_instructions li {
+    color: #E2E8F0 !important; /* Consistent light color for list items */
+}
+
+.dark #ai_helper_instructions strong {
+    color: #F7FAFC !important; /* Very light for emphasis */
+}
+
+/* Improve plan output placeholder text contrast in dark mode */
+.dark #plan_output_area {
+    color: #E2E8F0 !important;
+}
+
+.dark #plan_output_area p {
+    color: #E2E8F0 !important;
+}
 """
 
 # 保持美化的Gradio界面
