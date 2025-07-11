@@ -2,17 +2,38 @@ import gradio as gr
 import requests
 import os
 import json
+import logging
+import sys
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # 从环境变量中获取API密钥
 API_KEY = os.environ.get("SILICONFLOW_API_KEY")
 API_URL = "https://api.siliconflow.cn/v1/chat/completions"
 
+logger.info("VibeDoc应用启动中...")
+logger.info(f"API密钥配置状态: {'已配置' if API_KEY else '未配置'}")
+
 def generate_plan(user_idea):
     """
     接收用户想法，调用大模型API，并返回生成的开发计划。
     """
+    if not user_idea or not user_idea.strip():
+        return "请输入您的产品创意！"
+        
     if not API_KEY:
-        return "错误：未配置SILICONFLOW_API_KEY环境变量。请在创空间设置中添加。"
+        logger.error("API密钥未配置")
+        return "❌ 错误：未配置SILICONFLOW_API_KEY环境变量。请在创空间设置中添加。"
+
+    logger.info(f"开始生成开发计划，用户想法长度: {len(user_idea)}")
 
     # 这里是我们之前设计的"总指令 (Master Prompt)"
     master_prompt = f"""# 角色与目标
@@ -47,13 +68,14 @@ def generate_plan(user_idea):
                 "content": master_prompt
             }
         ],
-        "max_tokens": 4000,
+        "max_tokens": 3500,
         "temperature": 0.7,
         "stream": False
     }
 
     try:
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=180)
+        logger.info("正在调用Silicon Flow API...")
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
         
         # 如果响应不成功，打印详细错误信息
         if response.status_code != 200:
@@ -62,20 +84,29 @@ def generate_plan(user_idea):
                 error_json = response.json()
                 error_detail += f", 错误详情: {error_json}"
             except:
-                error_detail += f", 响应内容: {response.text}"
-            return f"API请求失败: {error_detail}"
+                error_detail += f", 响应内容: {response.text[:500]}"
+            logger.error(f"API请求失败: {error_detail}")
+            return f"❌ API请求失败: {error_detail}"
         
         data = response.json()
         generated_content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
         
         if not generated_content:
-            return f"API返回了空内容，完整响应: {data}"
+            logger.error(f"API返回空内容: {data}")
+            return f"❌ API返回了空内容，请稍后重试"
             
+        logger.info("✅ 开发计划生成成功")
         return generated_content
+        
+    except requests.exceptions.Timeout:
+        logger.error("API请求超时")
+        return "❌ 请求超时，请稍后重试"
     except requests.exceptions.RequestException as e:
-        return f"网络请求失败: {e}"
+        logger.error(f"网络请求失败: {e}")
+        return f"❌ 网络请求失败，请检查网络连接后重试"
     except Exception as e:
-        return f"处理时发生未知错误: {e}"
+        logger.error(f"处理时发生未知错误: {e}")
+        return f"❌ 处理时发生错误，请稍后重试"
 
 # 创建Gradio界面
 with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="blue")) as demo:
@@ -108,6 +139,21 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="blue")
 
 # 启动Gradio应用，启用MCP服务器功能
 if __name__ == "__main__":
-    # 设置环境变量以启用MCP服务器
-    os.environ["GRADIO_MCP_SERVER"] = "True"
-    demo.launch()
+    try:
+        # 设置环境变量以启用MCP服务器
+        os.environ["GRADIO_MCP_SERVER"] = "True"
+        logger.info("启动VibeDoc应用，MCP服务器已启用")
+        
+        # 启动应用，设置更合适的配置
+        demo.launch(
+            server_name="0.0.0.0",
+            server_port=7860,
+            share=False,
+            inbrowser=False,
+            quiet=False,
+            show_error=True,
+            mcp_server=True
+        )
+    except Exception as e:
+        logger.error(f"应用启动失败: {e}")
+        raise
