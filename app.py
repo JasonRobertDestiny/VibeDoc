@@ -14,6 +14,20 @@ API_KEY = os.environ.get("SILICONFLOW_API_KEY", "sk-eeqxcykxvmomeunmpbbgdsqgvrxq
 API_URL = "https://api.siliconflow.cn/v1/chat/completions"
 DEEPWIKI_SSE_URL = os.environ.get("DEEPWIKI_SSE_URL")
 FETCH_SSE_URL = os.environ.get("FETCH_SSE_URL")
+DOUBAO_SSE_URL = os.environ.get("DOUBAO_SSE_URL")
+DOUBAO_API_KEY = os.environ.get("DOUBAO_API_KEY")
+
+# 设置Doubao API Key（应用启动时）
+if DOUBAO_SSE_URL and DOUBAO_API_KEY:
+    print("--- [LOG] Setting Doubao API Key on startup... ---")
+    try:
+        requests.post(
+            DOUBAO_SSE_URL,
+            json={"action": "set_api_key", "params": {"api_key": DOUBAO_API_KEY}},
+            timeout=10
+        )
+    except Exception as e:
+        print(f"--- [ERROR] Failed to set Doubao API Key on startup: {e} ---")
 
 def generate_development_plan(user_idea: str, deepwiki_url: str = "") -> str:
     """
@@ -185,7 +199,56 @@ def generate_development_plan(user_idea: str, deepwiki_url: str = "") -> str:
             content = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
             if content:
                 # 后处理：确保内容结构化
-                return format_response(content)
+                final_plan_text = format_response(content)
+                
+                # 生成概念LOGO图像
+                if DOUBAO_SSE_URL and DOUBAO_API_KEY:
+                    print("--- [LOG] Generating concept logo with Doubao... ---")
+                    try:
+                        # 创建图像提示词
+                        image_prompt = f"Logo for a new app: {user_idea}, minimalist, vector art, clean background"
+                        
+                        # 构建Doubao text_to_image调用的JSON载荷
+                        image_payload = {
+                            "action": "text_to_image",
+                            "params": {
+                                "prompt": image_prompt,
+                                "size": "1024x1024"
+                            }
+                        }
+                        
+                        # 调用Doubao text_to_image
+                        image_response = requests.post(
+                            DOUBAO_SSE_URL,
+                            json=image_payload,
+                            timeout=30
+                        )
+                        
+                        if image_response.status_code == 200:
+                            image_data = image_response.json()
+                            # 解析图像URL（根据实际响应格式调整）
+                            if "result" in image_data and image_data["result"] and len(image_data["result"]) > 0:
+                                image_url = image_data["result"][0].get("url", "")
+                                if image_url:
+                                    # 添加图像到计划中
+                                    image_markdown = f"\n\n---\n\n## 🎨 概念LOGO\n![Concept Logo]({image_url})"
+                                    final_plan_text += image_markdown
+                                    print(f"--- [LOG] 成功生成概念LOGO图像 ---")
+                                else:
+                                    print("--- [LOG] 图像生成响应中未找到URL ---")
+                            else:
+                                print("--- [LOG] 图像生成响应格式不正确 ---")
+                        else:
+                            print(f"--- [LOG] 图像生成失败: HTTP {image_response.status_code} ---")
+                            
+                    except requests.exceptions.Timeout:
+                        print("--- [LOG] 图像生成超时 ---")
+                    except requests.exceptions.ConnectionError:
+                        print("--- [LOG] 图像生成连接失败 ---")
+                    except Exception as e:
+                        print(f"--- [LOG] 图像生成错误: {str(e)} ---")
+                
+                return final_plan_text
             else:
                 return "❌ API返回空内容"
         else:
