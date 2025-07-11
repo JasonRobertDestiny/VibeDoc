@@ -12,13 +12,15 @@ logger = logging.getLogger(__name__)
 # API配置
 API_KEY = os.environ.get("SILICONFLOW_API_KEY", "sk-eeqxcykxvmomeunmpbbgdsqgvrxqksyapauxzexphsiflgsy")
 API_URL = "https://api.siliconflow.cn/v1/chat/completions"
+DEEPWIKI_SSE_URL = os.environ.get("DEEPWIKI_SSE_URL")
 
-def generate_development_plan(user_idea: str) -> str:
+def generate_development_plan(user_idea: str, deepwiki_url: str = "") -> str:
     """
     基于用户创意生成完整的产品开发计划和对应的AI编程助手提示词。
     
     Args:
         user_idea (str): 用户的产品创意描述，可以是任何类型的应用或服务想法
+        deepwiki_url (str): 可选的DeepWiki文档链接，用于获取外部知识库参考
         
     Returns:
         str: 包含开发计划和AI编程提示词的完整方案，采用结构化的Markdown格式
@@ -28,6 +30,54 @@ def generate_development_plan(user_idea: str) -> str:
         
     if not API_KEY:
         return "❌ 错误：未配置API密钥"
+    
+    # 检查并调用DeepWiki MCP
+    retrieved_knowledge = ""
+    if deepwiki_url and deepwiki_url.strip():
+        print("--- [LOG] DeepWiki URL provided. Calling DeepWiki MCP... ---")
+        
+        if not DEEPWIKI_SSE_URL:
+            return "❌ 错误：未配置DEEPWIKI_SSE_URL环境变量"
+        
+        try:
+            # 构建DeepWiki MCP调用的JSON载荷
+            deepwiki_payload = {
+                "action": "deepwiki_fetch",
+                "params": {
+                    "url": deepwiki_url.strip(),
+                    "mode": "aggregate"
+                }
+            }
+            
+            # 调用DeepWiki MCP
+            deepwiki_response = requests.post(
+                DEEPWIKI_SSE_URL,
+                headers={"Content-Type": "application/json"},
+                json=deepwiki_payload,
+                timeout=30
+            )
+            
+            if deepwiki_response.status_code == 200:
+                deepwiki_data = deepwiki_response.json()
+                if "data" in deepwiki_data and deepwiki_data["data"]:
+                    retrieved_knowledge = deepwiki_data["data"]
+                    print(f"--- [LOG] DeepWiki MCP成功获取知识，长度: {len(retrieved_knowledge)} 字符 ---")
+                else:
+                    retrieved_knowledge = "❌ DeepWiki MCP返回空数据"
+                    print("--- [LOG] DeepWiki MCP返回空数据 ---")
+            else:
+                retrieved_knowledge = f"❌ DeepWiki MCP调用失败: HTTP {deepwiki_response.status_code}"
+                print(f"--- [LOG] DeepWiki MCP调用失败: {deepwiki_response.status_code} ---")
+                
+        except requests.exceptions.Timeout:
+            retrieved_knowledge = "❌ DeepWiki MCP调用超时"
+            print("--- [LOG] DeepWiki MCP调用超时 ---")
+        except requests.exceptions.ConnectionError:
+            retrieved_knowledge = "❌ DeepWiki MCP连接失败"
+            print("--- [LOG] DeepWiki MCP连接失败 ---")
+        except Exception as e:
+            retrieved_knowledge = f"❌ DeepWiki MCP调用错误: {str(e)}"
+            print(f"--- [LOG] DeepWiki MCP调用错误: {str(e)} ---")
 
     # 使用二段式提示词，生成开发计划和编程提示词
     system_prompt = """你是一个资深技术项目经理，精通产品规划和 AI 编程助手（如 GitHub Copilot、ChatGPT Code）提示词撰写。当收到一个产品创意时，你要：
@@ -41,9 +91,23 @@ def generate_development_plan(user_idea: str) -> str:
 
 格式要求：先输出开发计划，然后输出编程提示词部分。"""
 
-    user_prompt = f"""产品创意：{user_idea}
+    # 构建用户提示词，如果有外部知识则注入
+    user_prompt = f"""产品创意：{user_idea}"""
+    
+    # 如果成功获取到外部知识，则注入到提示词中
+    if retrieved_knowledge and not retrieved_knowledge.startswith("❌"):
+        user_prompt += f"""
 
-请生成：
+# 外部知识库参考 (DeepWiki)
+{retrieved_knowledge}
+
+请基于上述外部知识库参考和产品创意生成："""
+    else:
+        user_prompt += """
+
+请生成："""
+    
+    user_prompt += """
 1. 详细的开发计划（包含产品概述、技术方案、开发计划、部署方案、推广策略等）
 2. 每个功能模块对应的AI编程助手提示词
 
@@ -488,6 +552,13 @@ with gr.Blocks(
                 show_label=False
             )
             
+            deepwiki_url_input = gr.Textbox(
+                label="参考的DeepWiki链接 (可选)",
+                placeholder="输入DeepWiki文档链接以获取更准确的开发建议...",
+                lines=1,
+                show_label=True
+            )
+            
             generate_btn = gr.Button(
                 "🤖 AI生成开发计划 + 编程提示词",
                 variant="primary",
@@ -632,7 +703,7 @@ with gr.Blocks(
     # 绑定事件 - 只有主函数使用api_name
     generate_btn.click(
         fn=generate_development_plan,
-        inputs=[idea_input],
+        inputs=[idea_input, deepwiki_url_input],
         outputs=[plan_output],
         api_name="generate_plan"  # 确保MCP只识别主函数
     )
