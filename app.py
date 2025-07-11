@@ -767,12 +767,12 @@ with gr.Blocks(
     
     gr.HTML("""
     <div class="header-gradient">
-        <h1>🚀 VibeDoc - AI开发计划生成器</h1>
+        <h1>🚀 VibeDoc - AI Agent开发计划生成器</h1>
         <p style="font-size: 18px; margin: 15px 0; opacity: 0.95;">
-            基于AI的产品开发计划生成工具，支持MCP协议
+            基于AI的Agent应用，集成多种MCP服务提供智能开发计划生成
         </p>
         <p style="opacity: 0.85;">
-            一键将创意转化为完整的开发方案 + AI编程助手提示词，可被Claude等AI助手调用
+            一键将创意转化为完整的开发方案 + AI编程助手提示词，展示Agent应用与MCP服务协作能力
         </p>
     </div>
     """)
@@ -874,22 +874,51 @@ with gr.Blocks(
     </div>
     """)
     
-    # MCP测试部分
-    with gr.Accordion("🔧 如何通过API或MCP使用本工具", open=False):
-        gr.Code(
-            value="""# 将 YOUR_APP_URL 替换为您的创空间URL, 比如 https://jasonrobert-vibedocs.modelscope.cn
-# 将 YOUR_IDEA 替换为您的产品创意
-curl -X POST YOUR_APP_URL/api/generate_plan -H "Content-Type: application/json" -d '{"data": ["YOUR_IDEA"]}'""",
-            language="shell",
-            label="MCP API调用示例"
-        )
+    # Agent应用展示部分
+    with gr.Accordion("🤖 Agent应用架构说明", open=False):
         gr.Markdown("""
-**使用说明：**
-1. 将 `YOUR_APP_URL` 替换为您的创空间实际URL
-2. 将 `YOUR_IDEA` 替换为您的产品创意描述  
-3. 在终端或命令行中执行此命令即可获得JSON格式的开发计划
-4. 此API也可以被其他MCP客户端调用，实现自动化开发计划生成
+### 🎯 **Agent应用特色**
+
+VibeDoc 是一个展示 **Agent应用** 能力的典型案例：
+
+**🔄 Agent工作流程：**
+1. **接收用户输入** - 处理产品创意和参考链接
+2. **智能路由决策** - 根据URL类型选择合适的MCP服务
+3. **多服务协作** - 调用DeepWiki、Fetch、Doubao等MCP服务
+4. **知识融合处理** - 将外部知识与AI推理结合
+5. **结构化输出** - 生成完整的开发计划和编程助手提示词
+
+**🤖 与传统应用的区别：**
+- ❌ **传统应用**: 固定的处理逻辑，单一的数据源
+- ✅ **Agent应用**: 智能决策路由，多服务协作，自适应工作流
+
+**🌟 技术亮点：**
+- 🧠 智能服务路由算法
+- 🔗 多MCP服务无缝集成  
+- 🛡️ 完善的容错降级机制
+- 📊 知识增强的AI生成
         """)
+        
+        gr.Code(
+            value="""# Agent应用 vs MCP Server 的区别
+
+🤖 Agent应用 (我们的VibeDoc):
+├── 使用者: 调用多个MCP服务
+├── 职责: 智能决策和服务协作
+├── 特点: 自适应工作流，多源数据融合
+└── 价值: 提供完整的业务解决方案
+
+🔧 MCP Server:
+├── 提供者: 被Agent应用调用
+├── 职责: 提供特定功能服务
+├── 特点: 标准化接口，专业化能力
+└── 价值: 为Agent提供可复用的组件
+
+💡 VibeDoc展示了Agent如何智能地协调多个MCP服务，
+   实现比单个服务更强大的综合能力！""",
+            language="yaml",
+            label="Agent应用架构说明"
+        )
     
     # 绑定事件
     generate_btn.click(
@@ -902,6 +931,10 @@ curl -X POST YOUR_APP_URL/api/generate_plan -H "Content-Type: application/json" 
         outputs=[download_file]
     )
 
-# 启动应用
+# 启动应用 - 修正：我们是Agent应用，不是MCP Server
 if __name__ == "__main__":
-    demo.launch(mcp_server=True)
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=3000,
+        share=False
+    )

@@ -24,9 +24,12 @@ short_description: 🔥 一键将创意转化为完整开发方案！AI驱动的
 ### 🔥 一键将创意转化为完整开发方案！
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
+[![Gradio](https://img.shields.io/badge/Gradio-5.34.1-FF6B6B)](https://gradio.app/)
+[![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
 [![MCP Server](https://img.shields.io/badge/MCP-Server-green)](https://modelscope.cn)
+
+### 🌟 **在线体验地址**
+[![魔塔创空间](https://img.shields.io/badge/🚀_立即体验-魔塔创空间-FF6B6B?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTggMTZMMTMuODU2NCA4SDguNUw4IDE2WiIgZmlsbD0id2hpdGUiLz4KPHA+dGggZD0iTTggMTZMMi4xNDM2NCA4SDcuNUw4IDE2WiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+&logoWidth=16)](https://www.modelscope.cn/studios/JasonRobert/Vibedocs/)
 
 > 🏆 **参赛项目** - 魔塔MCP&Agent挑战赛2025 - Agent应用开发赛道
 
@@ -36,13 +39,27 @@ short_description: 🔥 一键将创意转化为完整开发方案！AI驱动的
 
 VibeDoc 是一个基于 AI 的智能开发计划生成工具，专为魔塔MCP&Agent挑战赛2025 Agent应用开发赛道设计。帮助开发者和产品经理快速将创意转化为完整的技术开发方案。
 
-**核心能力：**
+### 📊 **项目数据**
+- ⚡ **生成速度**: 30秒内完成完整开发计划
+- 🔗 **MCP集成**: 支持3+种MCP服务智能路由
+- 🤖 **AI模型**: 基于Qwen2.5-72B-Instruct
+- 📋 **输出内容**: 6大模块结构化文档
+- 🛠️ **技术栈**: Python + Gradio + AI + MCP
+
+### 🌟 **核心亮点**
 - 🧠 **AI 智能生成**：30秒内将创意转化为完整开发计划
 - 🔗 **多源知识融合**：支持DeepWiki和通用网页内容参考
-- 🛠️ **双模式支持**：AI生成与手动填写模式自由切换
+- 🛠️ **智能路由系统**：自动选择合适的MCP服务获取外部知识
 - 📋 **结构化输出**：标准化的项目规划文档
 - 🤖 **AI编程助手**：生成可直接使用的编程提示词
-- 🌐 **智能路由**：自动选择合适的MCP服务获取外部知识
+- 🎨 **概念LOGO生成**：自动生成项目视觉标识
+- 📁 **一键下载**：支持Markdown文档导出
+
+### 🏆 **Agent应用特色**
+- 🔄 **多Agent协作**：DeepWiki + Fetch + Doubao无缝集成
+- 🧠 **知识增强生成**：外部知识与AI深度融合
+- 🎯 **自适应工作流**：根据输入类型智能选择处理策略
+- 🛡️ **容错降级机制**：确保服务高可用性
 
 ## 🎬 系统架构与流程图
 
@@ -184,29 +201,54 @@ sequenceDiagram
 
 ## 🚀 快速体验
 
-### 📱 使用步骤
-1. **输入创意** → 描述你的产品想法
-2. **AI 分析** → 30秒智能生成方案
-3. **获得结果** → 完整的开发计划文档
-4. **开始编程** → 使用生成的AI助手提示词
+### 🌟 **在线体验（推荐）**
+[![立即体验](https://img.shields.io/badge/🚀_立即体验-魔塔创空间-FF6B6B?style=for-the-badge)](https://www.modelscope.cn/studios/JasonRobert/Vibedocs/)
+
+**无需安装，打开即用！**
+
+### 📱 **使用步骤**
+1. **🔗 访问链接** → 点击上方体验按钮
+2. **💡 输入创意** → 在文本框中描述你的产品想法
+3. **🔗 添加参考**（可选）→ 输入相关网页链接作为参考
+4. **🤖 AI 生成** → 点击生成按钮，30秒获得完整方案
+5. **📋 获得结果** → 完整的开发计划 + AI编程提示词
+6. **📁 下载保存** → 导出Markdown文档到本地
+
+### 💡 **使用示例**
+```
+输入创意: "我想开发一个基于AI的代码审查工具，能够自动检测代码质量问题并给出优化建议"
+
+30秒后获得:
+├── 📋 完整产品规划 (市场分析、功能设计、商业模式)
+├── 🛠️ 技术架构方案 (Python + FastAPI + AI模型)
+├── 🚀 部署运维策略 (Docker + 云平台 + CI/CD)
+├── 📈 推广营销计划 (开源社区 + 技术博客)
+├── 🤖 AI编程助手 (直接可用的提示词)
+└── 🎨 概念LOGO (自动生成的视觉标识)
+```
+
+### 🎯 **适用人群**
+- 🚀 **创业者**: 快速验证产品想法和技术可行性
+- 👨‍💻 **开发者**: 项目启动和架构设计参考
+- 🏢 **产品经理**: 需求分析和团队沟通工具
+- 🎓 **学生**: 课程项目和毕业设计规划
 
 ## 🏗️ 技术架构
 
-### 🎨 前端技术栈
-- **Next.js 15** - 🚀 React 全栈框架（最新版本）
-- **React 19** - ⚛️ 最先进的用户界面库
-- **TypeScript** - 🔒 类型安全的 JavaScript
-- **Tailwind CSS 4** - 🎨 现代化原子CSS框架
-- **Shadcn/UI** - 🎭 精美的组件库
+### 🎨 **前端框架**
+- **Gradio 5.34.1** - 🚀 快速构建ML Web应用
+- **Python 3.11** - 🐍 现代化Python开发
+- **HTML/CSS/JS** - 🎭 自定义UI组件增强
 
-### 🧠 AI 技术栈
+### 🧠 **AI技术栈**
 - **Silicon Flow API** - 🌊 高性能大语言模型服务
 - **Qwen2.5-72B-Instruct** - 🤖 智能内容生成模型
 - **结构化提示工程** - 🎯 确保高质量输出
 
-### ⚡ 性能优化
-- **Turbopack** - 🚄 极速构建工具
-- **SSR/SSG** - 🏃‍♂️ 服务端渲染优化
+### ⚡ **性能优化**
+- **异步处理** - 🚄 非阻塞式API调用
+- **智能缓存** - 🏃‍♂️ 提升响应速度
+- **容错机制** - 🛡️ 确保服务稳定性
 - **CDN 加速** - 🌍 全球内容分发
 
 ## 🔌 MCP服务集成
@@ -500,7 +542,35 @@ VibeDocs/
 
 <div align="center">
 
-[![项目地址](https://img.shields.io/badge/项目地址-GitHub-181717?style=for-the-badge&logo=github)](https://github.com/JasonRobertDestiny/VibeDocs)
+### 🚀 **在线体验**
+[![魔塔创空间](https://img.shields.io/badge/魔塔创空间-在线体验-FF6B6B?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTggMTZMMTMuODU2NCA4SDguNUw4IDE2WiIgZmlsbD0id2hpdGUiLz4KPHA+dGggZD0iTTggMTZMMi4xNDM2NCA4SDcuNUw4IDE2WiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+&logoWidth=16)](https://www.modelscope.cn/studios/JasonRobert/Vibedocs/)
+
+### 🧑‍💻 **开发者联系方式**
+
+[![邮箱](https://img.shields.io/badge/📧_邮箱-johnrobertdestiny@gmail.com-EA4335?style=for-the-badge&logo=gmail&logoColor=white)](mailto:johnrobertdestiny@gmail.com)
+
+[![GitHub](https://img.shields.io/badge/🐱_GitHub-JasonRobertDestiny-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/JasonRobertDestiny)
+
+[![CSDN](https://img.shields.io/badge/📝_CSDN-Soulrobert520-FC5531?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTggMEw2IDJMMTAgNkw2IDEwTDggMTJMMTIgOEw4IDBaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K&logoWidth=16)](https://blog.csdn.net/Soulrobert520)
+
+[![掘金](https://img.shields.io/badge/💎_掘金-稀土掘金-1E80FF?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTggMUw0IDVIOEwxMiA1TDggMVoiIGZpbGw9IndoaXRlIi8+CjxwYXRoIGQ9Ik04IDVMMTIgOUg4TDQgOUw4IDVaIiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNOCA5TDEyIDEzSDhMNDEzTDggOVoiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo=&logoWidth=16)](https://juejin.cn/user/2637056597039172)
+
+[![B站](https://img.shields.io/badge/📺_B站-space.bilibili.com-FF69B4?style=for-the-badge&logo=bilibili&logoColor=white)](https://space.bilibili.com/648236073)
+
+### 📋 **项目信息**
+
+[![项目地址](https://img.shields.io/badge/🔗_源码仓库-GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/JasonRobertDestiny/VibeDocs)
+
+[![魔塔创空间](https://img.shields.io/badge/🏠_创空间地址-ModelScope-4285F4?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTggMTZMMTMuODU2NCA4SDguNUw4IDE2WiIgZmlsbD0id2hpdGUiLz4KPHA+dGggZD0iTTggMTZMMi4xNDM2NCA4SDcuNUw4IDE2WiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+&logoWidth=16)](https://www.modelscope.cn/studios/JasonRobert/Vibedocs/)
+
+---
+
+### 💬 **技术交流**
+
+- 🤝 **合作洽谈**: 通过邮箱联系
+- 💡 **技术讨论**: CSDN博客留言
+- 🎯 **项目反馈**: GitHub Issues
+- 📺 **技术分享**: B站关注获取最新动态
 
 </div>
 
