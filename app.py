@@ -83,8 +83,6 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="blue")
         """
         # 🚀 VibeDoc - AI驱动的开发计划生成器
         一键将创意转化为完整的开发方案！参赛魔搭AI Hackathon 2025 (MCP Server开发赛道)。
-        
-        **🔥 MCP Server功能已启用** - 此应用同时提供Web界面和MCP服务器API
         """
     )
     
