@@ -115,7 +115,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="blue")
     gr.Markdown(
         """
         # 🚀 VibeDoc - AI驱动的开发计划生成器
-        一键将创意转化为完整的开发方案！参赛魔搭AI Hackathon 2025 (MCP Server开发赛道)。
+        一键将创意转化为完整的开发方案！参赛魔塔MCP&Agent挑战赛2025 (Agent应用开发赛道)。
         
         **✨ 功能特色：**
         - 🤖 基于Qwen2.5-72B-Instruct大模型

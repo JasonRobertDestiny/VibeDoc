@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 API_KEY = os.environ.get("SILICONFLOW_API_KEY", "sk-eeqxcykxvmomeunmpbbgdsqgvrxqksyapauxzexphsiflgsy")
 API_URL = "https://api.siliconflow.cn/v1/chat/completions"
 DEEPWIKI_SSE_URL = os.environ.get("DEEPWIKI_SSE_URL")
+FETCH_SSE_URL = os.environ.get("FETCH_SSE_URL")
 
 def generate_development_plan(user_idea: str, deepwiki_url: str = "") -> str:
     """
@@ -31,53 +32,104 @@ def generate_development_plan(user_idea: str, deepwiki_url: str = "") -> str:
     if not API_KEY:
         return "❌ 错误：未配置API密钥"
     
-    # 检查并调用DeepWiki MCP
+    # 检查并调用相应的MCP服务（智能路由）
     retrieved_knowledge = ""
     if deepwiki_url and deepwiki_url.strip():
-        print("--- [LOG] DeepWiki URL provided. Calling DeepWiki MCP... ---")
+        url = deepwiki_url.strip()
         
-        if not DEEPWIKI_SSE_URL:
-            return "❌ 错误：未配置DEEPWIKI_SSE_URL环境变量"
-        
-        try:
-            # 构建DeepWiki MCP调用的JSON载荷
-            deepwiki_payload = {
-                "action": "deepwiki_fetch",
-                "params": {
-                    "url": deepwiki_url.strip(),
-                    "mode": "aggregate"
+        # 智能路由：根据URL类型选择不同的MCP服务
+        if "deepwiki.org" in url:
+            # 调用DeepWiki MCP服务
+            print("--- [LOG] DeepWiki URL provided. Calling DeepWiki MCP... ---")
+            
+            if not DEEPWIKI_SSE_URL:
+                return "❌ 错误：未配置DEEPWIKI_SSE_URL环境变量"
+            
+            try:
+                # 构建DeepWiki MCP调用的JSON载荷
+                deepwiki_payload = {
+                    "action": "deepwiki_fetch",
+                    "params": {
+                        "url": url,
+                        "mode": "aggregate"
+                    }
                 }
-            }
-            
-            # 调用DeepWiki MCP
-            deepwiki_response = requests.post(
-                DEEPWIKI_SSE_URL,
-                headers={"Content-Type": "application/json"},
-                json=deepwiki_payload,
-                timeout=30
-            )
-            
-            if deepwiki_response.status_code == 200:
-                deepwiki_data = deepwiki_response.json()
-                if "data" in deepwiki_data and deepwiki_data["data"]:
-                    retrieved_knowledge = deepwiki_data["data"]
-                    print(f"--- [LOG] DeepWiki MCP成功获取知识，长度: {len(retrieved_knowledge)} 字符 ---")
-                else:
-                    retrieved_knowledge = "❌ DeepWiki MCP返回空数据"
-                    print("--- [LOG] DeepWiki MCP返回空数据 ---")
-            else:
-                retrieved_knowledge = f"❌ DeepWiki MCP调用失败: HTTP {deepwiki_response.status_code}"
-                print(f"--- [LOG] DeepWiki MCP调用失败: {deepwiki_response.status_code} ---")
                 
-        except requests.exceptions.Timeout:
-            retrieved_knowledge = "❌ DeepWiki MCP调用超时"
-            print("--- [LOG] DeepWiki MCP调用超时 ---")
-        except requests.exceptions.ConnectionError:
-            retrieved_knowledge = "❌ DeepWiki MCP连接失败"
-            print("--- [LOG] DeepWiki MCP连接失败 ---")
-        except Exception as e:
-            retrieved_knowledge = f"❌ DeepWiki MCP调用错误: {str(e)}"
-            print(f"--- [LOG] DeepWiki MCP调用错误: {str(e)} ---")
+                # 调用DeepWiki MCP
+                deepwiki_response = requests.post(
+                    DEEPWIKI_SSE_URL,
+                    headers={"Content-Type": "application/json"},
+                    json=deepwiki_payload,
+                    timeout=30
+                )
+                
+                if deepwiki_response.status_code == 200:
+                    deepwiki_data = deepwiki_response.json()
+                    if "data" in deepwiki_data and deepwiki_data["data"]:
+                        retrieved_knowledge = deepwiki_data["data"]
+                        print(f"--- [LOG] DeepWiki MCP成功获取知识，长度: {len(retrieved_knowledge)} 字符 ---")
+                    else:
+                        retrieved_knowledge = "❌ DeepWiki MCP返回空数据"
+                        print("--- [LOG] DeepWiki MCP返回空数据 ---")
+                else:
+                    retrieved_knowledge = f"❌ DeepWiki MCP调用失败: HTTP {deepwiki_response.status_code}"
+                    print(f"--- [LOG] DeepWiki MCP调用失败: {deepwiki_response.status_code} ---")
+                    
+            except requests.exceptions.Timeout:
+                retrieved_knowledge = "❌ DeepWiki MCP调用超时"
+                print("--- [LOG] DeepWiki MCP调用超时 ---")
+            except requests.exceptions.ConnectionError:
+                retrieved_knowledge = "❌ DeepWiki MCP连接失败"
+                print("--- [LOG] DeepWiki MCP连接失败 ---")
+            except Exception as e:
+                retrieved_knowledge = f"❌ DeepWiki MCP调用错误: {str(e)}"
+                print(f"--- [LOG] DeepWiki MCP调用错误: {str(e)} ---")
+        
+        else:
+            # 调用通用fetch MCP服务
+            print("--- [LOG] Generic URL detected. Calling fetch MCP... ---")
+            
+            if not FETCH_SSE_URL:
+                return "❌ 错误：未配置FETCH_SSE_URL环境变量"
+            
+            try:
+                # 构建fetch MCP调用的JSON载荷
+                fetch_payload = {
+                    "action": "fetch",
+                    "params": {
+                        "url": url
+                    }
+                }
+                
+                # 调用fetch MCP
+                fetch_response = requests.post(
+                    FETCH_SSE_URL,
+                    headers={"Content-Type": "application/json"},
+                    json=fetch_payload,
+                    timeout=30
+                )
+                
+                if fetch_response.status_code == 200:
+                    fetch_data = fetch_response.json()
+                    if "data" in fetch_data and fetch_data["data"]:
+                        retrieved_knowledge = fetch_data["data"]
+                        print(f"--- [LOG] fetch MCP成功获取知识，长度: {len(retrieved_knowledge)} 字符 ---")
+                    else:
+                        retrieved_knowledge = "❌ fetch MCP返回空数据"
+                        print("--- [LOG] fetch MCP返回空数据 ---")
+                else:
+                    retrieved_knowledge = f"❌ fetch MCP调用失败: HTTP {fetch_response.status_code}"
+                    print(f"--- [LOG] fetch MCP调用失败: {fetch_response.status_code} ---")
+                    
+            except requests.exceptions.Timeout:
+                retrieved_knowledge = "❌ fetch MCP调用超时"
+                print("--- [LOG] fetch MCP调用超时 ---")
+            except requests.exceptions.ConnectionError:
+                retrieved_knowledge = "❌ fetch MCP连接失败"
+                print("--- [LOG] fetch MCP连接失败 ---")
+            except Exception as e:
+                retrieved_knowledge = f"❌ fetch MCP调用错误: {str(e)}"
+                print(f"--- [LOG] fetch MCP调用错误: {str(e)} ---")
 
     # 使用二段式提示词，生成开发计划和编程提示词
     system_prompt = """你是一个资深技术项目经理，精通产品规划和 AI 编程助手（如 GitHub Copilot、ChatGPT Code）提示词撰写。当收到一个产品创意时，你要：
@@ -572,8 +624,8 @@ with gr.Blocks(
             )
             
             deepwiki_url_input = gr.Textbox(
-                label="参考的DeepWiki链接 (可选)",
-                placeholder="输入DeepWiki文档链接以获取更准确的开发建议...",
+                label="参考链接 (可选)",
+                placeholder="输入任何网页链接（如博客、新闻、文档）作为参考...",
                 lines=1,
                 show_label=True
             )
