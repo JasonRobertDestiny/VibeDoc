@@ -101,20 +101,11 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="blue")
     with gr.Row():
         plan_output = gr.Markdown(label="生成的开发计划")
 
-    # 添加MCP API端点
-    @demo.api(name="generate_development_plan")
-    def api_generate_plan(user_idea: str) -> str:
-        """
-        MCP API端点：生成开发计划
-        参数：user_idea - 用户的产品创意
-        返回：生成的开发计划（Markdown格式）
-        """
-        return generate_plan(user_idea)
-
     submit_button.click(
         fn=generate_plan,
         inputs=idea_input,
-        outputs=plan_output
+        outputs=plan_output,
+        api_name="generate_development_plan"
     )
 
 # 启动Gradio应用，启用MCP服务器功能
