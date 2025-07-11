@@ -83,47 +83,101 @@ def generate_development_plan(user_idea: str) -> str:
         return f"❌ 处理错误: {str(e)}"
 
 def format_response(content: str) -> str:
-    """格式化AI回复，确保包含编程提示词部分"""
+    """格式化AI回复，确保包含编程提示词部分并优化视觉呈现"""
     
-    # 如果内容中没有明确的编程提示词部分，添加一个分隔符
-    if "编程提示词" not in content and "编程助手" not in content and "Prompt" not in content:
-        content += """
+    # 添加时间戳和格式化标题
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # 在内容开头添加生成信息
+    formatted_content = f"""
+---
+
+# 🚀 AI生成的开发计划
+
+**⏰ 生成时间：** {timestamp}  
+**🤖 AI模型：** Qwen2.5-72B-Instruct  
+**💡 基于用户创意智能分析生成**
 
 ---
 
-## 🤖 AI编程助手提示词
+{content}
+"""
+    
+    # 如果内容中没有明确的编程提示词部分，添加一个格式化的分隔符
+    if "编程提示词" not in content and "编程助手" not in content and "Prompt" not in content:
+        formatted_content += """
+
+---
+
+<div class="section-divider"></div>
+
+# 🤖 AI编程助手提示词
+
+<div class="prompts-highlight">
 
 > 💡 **使用说明**：以下提示词可以直接复制到 Claude Code、GitHub Copilot、ChatGPT 等AI编程工具中使用
 
-### 核心功能开发提示词
-```
+## 🔧 核心功能开发提示词
+
+```bash
 基于上述开发计划，请为每个主要功能模块生成具体的实现代码。
-要求：
-1. 使用推荐的技术栈
-2. 包含完整的错误处理
-3. 添加必要的注释
-4. 遵循最佳实践和安全规范
+
+📋 要求：
+• 使用推荐的技术栈
+• 包含完整的错误处理
+• 添加必要的注释和文档
+• 遵循最佳实践和安全规范
+• 确保代码可读性和可维护性
 ```
 
-### 数据库设计提示词  
-```
-根据产品需求设计数据库结构，包括：
-1. 实体关系图(ERD)
-2. 表结构定义(DDL)
-3. 索引优化建议
-4. 数据迁移脚本
+## 🗄️ 数据库设计提示词
+
+```sql
+根据产品需求设计完整的数据库架构：
+
+📊 包含内容：
+• 实体关系图(ERD)设计
+• 完整的表结构定义(DDL)
+• 索引优化策略
+• 数据迁移和初始化脚本
+• 数据备份和恢复方案
 ```
 
-### API接口开发提示词
+## 🌐 API接口开发提示词
+
+```javascript
+设计和实现完整的RESTful API接口系统：
+
+🔗 开发要求：
+• 完整的API文档(OpenAPI/Swagger)
+• 详细的请求/响应示例
+• 标准化的错误码定义
+• 完整的接口测试用例
+• API版本控制策略
 ```
-设计和实现RESTful API接口，要求：
-1. 完整的接口文档
-2. 请求/响应示例
-3. 错误码定义
-4. 接口测试用例
-```"""
+
+## 🎨 前端界面开发提示词
+
+```css
+基于开发计划创建现代化的用户界面：
+
+🎯 设计目标：
+• 响应式设计，支持多设备
+• 现代化UI组件和交互
+• 无障碍访问支持
+• 性能优化和用户体验
+• 国际化和主题切换
+```
+
+</div>
+
+---
+
+**💡 提示：** 将上述任一提示词复制到AI编程工具中，即可获得针对性的代码实现方案！
+"""
     
-    return content
+    return formatted_content
 
 # 自定义CSS - 保持美化UI
 custom_css = """
@@ -202,6 +256,204 @@ custom_css = """
     border-radius: 10px;
     padding: 20px;
     margin: 20px 0;
+}
+
+/* Enhanced Markdown Styling */
+#plan_result {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    line-height: 1.7;
+    color: #2d3748;
+}
+
+#plan_result h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #1a202c;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 3px solid #4299e1;
+}
+
+#plan_result h2 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #2d3748;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid #68d391;
+}
+
+#plan_result h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #4a5568;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+}
+
+#plan_result h4 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #5a67d8;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+}
+
+#plan_result h5, #plan_result h6 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #667eea;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+#plan_result p {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    line-height: 1.8;
+}
+
+#plan_result ul, #plan_result ol {
+    margin: 1rem 0;
+    padding-left: 2rem;
+}
+
+#plan_result li {
+    margin-bottom: 0.5rem;
+    line-height: 1.7;
+}
+
+#plan_result ul li {
+    list-style-type: none;
+    position: relative;
+}
+
+#plan_result ul li:before {
+    content: "▶";
+    color: #4299e1;
+    font-weight: bold;
+    position: absolute;
+    left: -1.5rem;
+}
+
+#plan_result blockquote {
+    border-left: 4px solid #4299e1;
+    background: #ebf8ff;
+    padding: 1rem 1.5rem;
+    margin: 1.5rem 0;
+    border-radius: 0.5rem;
+    font-style: italic;
+    color: #2b6cb0;
+}
+
+#plan_result code {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.375rem;
+    font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+    font-size: 0.875rem;
+    color: #d53f8c;
+}
+
+#plan_result pre {
+    background: #1a202c;
+    color: #f7fafc;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    overflow-x: auto;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+#plan_result pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: #f7fafc;
+    font-size: 0.9rem;
+}
+
+#plan_result table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    background: white;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#plan_result th {
+    background: #4299e1;
+    color: white;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+}
+
+#plan_result td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+#plan_result tr:nth-child(even) {
+    background: #f7fafc;
+}
+
+#plan_result tr:hover {
+    background: #ebf8ff;
+}
+
+#plan_result strong {
+    color: #2d3748;
+    font-weight: 600;
+}
+
+#plan_result em {
+    color: #5a67d8;
+    font-style: italic;
+}
+
+#plan_result hr {
+    border: none;
+    height: 2px;
+    background: linear-gradient(90deg, #4299e1 0%, #68d391 100%);
+    margin: 2rem 0;
+    border-radius: 1px;
+}
+
+/* Special styling for prompts section */
+#plan_result .prompts-highlight {
+    background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
+    border: 2px solid #4299e1;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    position: relative;
+}
+
+#plan_result .prompts-highlight:before {
+    content: "🤖";
+    position: absolute;
+    top: -0.5rem;
+    left: 1rem;
+    background: #4299e1;
+    color: white;
+    padding: 0.5rem;
+    border-radius: 50%;
+    font-size: 1.2rem;
+}
+
+/* Improved section dividers */
+#plan_result .section-divider {
+    background: linear-gradient(90deg, transparent 0%, #4299e1 20%, #68d391 80%, transparent 100%);
+    height: 1px;
+    margin: 2rem 0;
 }
 """
 
