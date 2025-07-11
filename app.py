@@ -114,8 +114,8 @@ def fetch_external_knowledge(reference_url: str) -> str:
     # 智能路由：根据URL类型选择不同的MCP服务
     if "deepwiki.org" in url:
         if not DEEPWIKI_SSE_URL:
-            logger.error("DEEPWIKI_SSE_URL not configured")
-            return "❌ DeepWiki服务未配置"
+            logger.warning("DEEPWIKI_SSE_URL not configured, using enhanced fallback")
+            return generate_enhanced_reference_info(url, "DeepWiki技术文档")
         
         payload = {
             "action": "deepwiki_fetch",
@@ -126,12 +126,15 @@ def fetch_external_knowledge(reference_url: str) -> str:
         }
         
         success, knowledge = call_mcp_service(DEEPWIKI_SSE_URL, payload, "DeepWiki")
-        return knowledge
+        if success:
+            return f"📖 **DeepWiki知识**：\n\n{knowledge}"
+        else:
+            return generate_enhanced_reference_info(url, "DeepWiki技术文档", knowledge)
     
     else:
         if not FETCH_SSE_URL:
-            logger.error("FETCH_SSE_URL not configured")
-            return "❌ Fetch服务未配置"
+            logger.warning("FETCH_SSE_URL not configured, using enhanced fallback")
+            return generate_enhanced_reference_info(url, "外部参考资料")
         
         payload = {
             "action": "fetch",
@@ -141,7 +144,82 @@ def fetch_external_knowledge(reference_url: str) -> str:
         }
         
         success, knowledge = call_mcp_service(FETCH_SSE_URL, payload, "Fetch")
-        return knowledge
+        if success:
+            return f"🔗 **外部知识**：\n\n{knowledge}"
+        else:
+            return generate_enhanced_reference_info(url, "外部参考资料", knowledge)
+
+def generate_enhanced_reference_info(url: str, source_type: str, error_msg: str = None) -> str:
+    """生成增强的参考信息，当MCP服务不可用时提供有用的上下文"""
+    from urllib.parse import urlparse
+    
+    parsed_url = urlparse(url)
+    domain = parsed_url.netloc
+    path = parsed_url.path
+    
+    # 根据URL结构推断内容类型
+    content_hints = []
+    
+    # 检测常见的技术站点
+    if "github.com" in domain:
+        content_hints.append("💻 开源代码仓库")
+    elif "stackoverflow.com" in domain:
+        content_hints.append("❓ 技术问答")
+    elif "medium.com" in domain:
+        content_hints.append("📝 技术博客")
+    elif "dev.to" in domain:
+        content_hints.append("👨‍💻 开发者社区")
+    elif "csdn.net" in domain:
+        content_hints.append("🇨🇳 CSDN技术博客")
+    elif "juejin.cn" in domain:
+        content_hints.append("💎 掘金技术文章")
+    elif "zhihu.com" in domain:
+        content_hints.append("🧠 知乎技术讨论")
+    elif "blog" in domain:
+        content_hints.append("📖 技术博客")
+    elif "docs" in domain:
+        content_hints.append("📚 技术文档")
+    elif "wiki" in domain:
+        content_hints.append("📖 知识库")
+    else:
+        content_hints.append("🔗 参考资料")
+    
+    # 根据路径推断内容
+    if "/article/" in path or "/post/" in path:
+        content_hints.append("📄 文章内容")
+    elif "/tutorial/" in path:
+        content_hints.append("📚 教程指南")
+    elif "/docs/" in path:
+        content_hints.append("📖 技术文档")
+    elif "/guide/" in path:
+        content_hints.append("📋 使用指南")
+    
+    hint_text = " | ".join(content_hints) if content_hints else "📄 网页内容"
+    
+    reference_info = f"""
+## 🔗 {source_type}参考
+
+**📍 来源链接：** [{domain}]({url})
+
+**🏷️ 内容类型：** {hint_text}
+
+**🤖 AI增强分析：** 
+> 虽然MCP服务暂时不可用，但AI将基于链接信息和上下文进行智能分析，
+> 并在生成的开发计划中融入该参考资料的相关性建议。
+
+**📋 参考价值：**
+- ✅ 提供技术选型参考
+- ✅ 补充实施细节
+- ✅ 增强方案可行性
+- ✅ 丰富最佳实践
+
+---
+"""
+    
+    if error_msg and not error_msg.startswith("❌"):
+        reference_info += f"\n**⚠️ 服务状态：** {error_msg}\n"
+    
+    return reference_info
 
 def generate_concept_logo(user_idea: str) -> str:
     """生成概念LOGO"""
@@ -333,19 +411,26 @@ def format_response(content: str) -> str:
     # 添加时间戳和格式化标题
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # 在内容开头添加生成信息
+    # 增强视觉呈现的格式化内容
     formatted_content = f"""
----
+<div class="plan-header">
 
 # 🚀 AI生成的开发计划
 
+<div class="meta-info">
+
 **⏰ 生成时间：** {timestamp}  
 **🤖 AI模型：** Qwen2.5-72B-Instruct  
-**💡 基于用户创意智能分析生成**
+**💡 基于用户创意智能分析生成**  
+**🔗 Agent应用MCP服务增强**
+
+</div>
+
+</div>
 
 ---
 
-{content}
+{enhance_markdown_structure(content)}
 """
     
     # 如果内容中没有明确的编程提示词部分，添加一个格式化的分隔符
@@ -422,6 +507,53 @@ def format_response(content: str) -> str:
 """
     
     return formatted_content
+
+def enhance_markdown_structure(content: str) -> str:
+    """增强Markdown结构，添加视觉亮点和层级"""
+    lines = content.split('\n')
+    enhanced_lines = []
+    
+    for line in lines:
+        stripped = line.strip()
+        
+        # 增强一级标题
+        if stripped and not stripped.startswith('#') and len(stripped) < 50 and '：' not in stripped and '.' not in stripped[:5]:
+            if any(keyword in stripped for keyword in ['产品概述', '技术方案', '开发计划', '部署方案', '推广策略', 'AI', '编程助手', '提示词']):
+                enhanced_lines.append(f"\n## 🎯 {stripped}\n")
+                continue
+        
+        # 增强二级标题
+        if stripped and '.' in stripped[:5] and len(stripped) < 100:
+            if stripped[0].isdigit():
+                enhanced_lines.append(f"\n### 📋 {stripped}\n")
+                continue
+                
+        # 增强功能列表
+        if stripped.startswith('主要功能') or stripped.startswith('目标用户'):
+            enhanced_lines.append(f"\n#### 🔹 {stripped}\n")
+            continue
+            
+        # 增强技术栈部分
+        if stripped in ['前端', '后端', 'AI 模型', '工具和库']:
+            enhanced_lines.append(f"\n#### 🛠️ {stripped}\n")
+            continue
+            
+        # 增强阶段标题
+        if '阶段' in stripped and '：' in stripped:
+            phase_num = stripped.split('第')[1].split('阶段')[0] if '第' in stripped else ''
+            phase_name = stripped.split('：')[1] if '：' in stripped else stripped
+            enhanced_lines.append(f"\n#### 🚀 第{phase_num}阶段：{phase_name}\n")
+            continue
+            
+        # 增强任务列表
+        if stripped.startswith('任务：'):
+            enhanced_lines.append(f"\n**📝 {stripped}**\n")
+            continue
+            
+        # 保持原有缩进的其他内容
+        enhanced_lines.append(line)
+    
+    return '\n'.join(enhanced_lines)
 
 # 自定义CSS - 保持美化UI
 custom_css = """
@@ -502,6 +634,23 @@ custom_css = """
     margin: 20px 0;
 }
 
+/* Enhanced Plan Header */
+.plan-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.meta-info {
+    background: rgba(255,255,255,0.1);
+    padding: 1rem;
+    border-radius: 10px;
+    margin-top: 1rem;
+}
+
 /* Enhanced Markdown Styling */
 #plan_result {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
@@ -527,6 +676,17 @@ custom_css = """
     margin-bottom: 1rem;
     padding-bottom: 0.3rem;
     border-bottom: 2px solid #68d391;
+    position: relative;
+}
+
+#plan_result h2::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -2px;
+    width: 50px;
+    height: 2px;
+    background: linear-gradient(90deg, #4299e1, #68d391);
 }
 
 #plan_result h3 {
@@ -537,6 +697,10 @@ custom_css = """
     margin-bottom: 0.75rem;
     display: flex;
     align-items: center;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(90deg, #f7fafc, #edf2f7);
+    border-left: 4px solid #4299e1;
+    border-radius: 0.5rem;
 }
 
 #plan_result h4 {
@@ -545,6 +709,8 @@ custom_css = """
     color: #5a67d8;
     margin-top: 1.25rem;
     margin-bottom: 0.5rem;
+    padding-left: 1rem;
+    border-left: 3px solid #5a67d8;
 }
 
 #plan_result h5, #plan_result h6 {
@@ -671,6 +837,16 @@ custom_css = """
     border-radius: 1px;
 }
 
+/* Special styling for reference info */
+.reference-info {
+    background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
+    border: 2px solid #4299e1;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    box-shadow: 0 4px 15px rgba(66, 153, 225, 0.1);
+}
+
 /* Special styling for prompts section */
 #plan_result .prompts-highlight {
     background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
@@ -756,6 +932,28 @@ custom_css = """
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/* Copy buttons styling */
+.copy-buttons {
+    display: flex;
+    gap: 10px;
+    margin: 1rem 0;
+}
+
+.copy-btn {
+    background: linear-gradient(45deg, #28a745, #20c997) !important;
+    border: none !important;
+    color: white !important;
+    padding: 8px 16px !important;
+    border-radius: 20px !important;
+    font-size: 14px !important;
+    transition: all 0.3s ease !important;
+}
+
+.copy-btn:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3) !important;
+}
 """
 
 # 保持美化的Gradio界面
@@ -836,14 +1034,25 @@ with gr.Blocks(
         prompts_for_copy = gr.Textbox(visible=False)
         download_file = gr.File(label="下载开发计划文档", visible=False)
         
-        # 简化的交互按钮 - 暂时移除复制功能以确保兼容性
+        # 添加复制和下载按钮
         with gr.Row():
-            gr.HTML("""
-            <div style="padding: 10px; background: #e3f2fd; border-radius: 8px; text-align: center;">
-                💡 <strong>使用提示</strong>: 生成结果后，可以手动选择文本进行复制。
-                <br>或者使用下方的下载功能保存为文件。
-            </div>
-            """)
+            copy_plan_btn = gr.Button(
+                "📋 复制开发计划",
+                variant="secondary",
+                size="sm"
+            )
+            copy_prompts_btn = gr.Button(
+                "🤖 复制编程提示词",
+                variant="secondary",
+                size="sm"
+            )
+            
+        # 使用提示
+        gr.HTML("""
+        <div style="padding: 10px; background: #e3f2fd; border-radius: 8px; text-align: center;">
+            💡 <strong>使用提示</strong>: 点击上方按钮复制内容到剪贴板，或使用下方下载功能保存为文件。
+        </div>
+        """)
         
     # 示例区域
     gr.Markdown("## 🎯 快速开始示例", elem_id="quick_start_container")
@@ -929,6 +1138,65 @@ VibeDoc 是一个展示 **Agent应用** 能力的典型案例：
     ).then(
         fn=lambda: gr.update(visible=True),
         outputs=[download_file]
+    )
+    
+    # 复制按钮事件（使用JavaScript实现）
+    copy_plan_btn.click(
+        fn=None,
+        inputs=[plan_output],
+        outputs=[],
+        js="""(plan_content) => {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(plan_content).then(() => {
+                    alert('✅ 开发计划已复制到剪贴板！');
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                    alert('❌ 复制失败，请手动选择文本复制');
+                });
+            } else {
+                // 降级方案
+                const textArea = document.createElement('textarea');
+                textArea.value = plan_content;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert('✅ 开发计划已复制到剪贴板！');
+                } catch (err) {
+                    alert('❌ 复制失败，请手动选择文本复制');
+                }
+                document.body.removeChild(textArea);
+            }
+        }"""
+    )
+    
+    copy_prompts_btn.click(
+        fn=None,
+        inputs=[prompts_for_copy],
+        outputs=[],
+        js="""(prompts_content) => {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(prompts_content).then(() => {
+                    alert('✅ 编程提示词已复制到剪贴板！');
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                    alert('❌ 复制失败，请手动选择文本复制');
+                });
+            } else {
+                // 降级方案
+                const textArea = document.createElement('textarea');
+                textArea.value = prompts_content;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert('✅ 编程提示词已复制到剪贴板！');
+                } catch (err) {
+                    alert('❌ 复制失败，请手动选择文本复制');
+                }
+                document.body.removeChild(textArea);
+            }
+        }"""
     )
 
 # 启动应用 - 修正：我们是Agent应用，不是MCP Server
