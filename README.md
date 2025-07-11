@@ -7,7 +7,7 @@ sdk: gradio
 sdk_version: 4.44.0
 app_file: app.py
 pinned: true
-license: apache-2.0
+license: mit
 tags:
   - AI
   - MCP Server
