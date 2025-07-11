@@ -1,2 +1,3 @@
-gradio[mcp]>=4.44.0
+mcp==1.8.1
+gradio[mcp]
 requests>=2.31.0

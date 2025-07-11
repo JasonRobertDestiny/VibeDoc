@@ -68,7 +68,6 @@ def generate_development_plan(user_idea: str) -> str:
 保持专业且实用，每个部分提供具体可执行的建议。"""
 
     try:
-        # 增加超时时间和重试机制
         response = requests.post(
             API_URL,
             headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
@@ -78,7 +77,7 @@ def generate_development_plan(user_idea: str) -> str:
                 "max_tokens": 3000,
                 "temperature": 0.7
             },
-            timeout=120  # 增加到120秒
+            timeout=120
         )
         
         if response.status_code == 200:
@@ -113,7 +112,7 @@ def download_as_file(content, filename, format_type):
     
     return temp_file.name
 
-# 自定义CSS
+# 自定义CSS - 保持美化UI
 custom_css = """
 .main-container {
     max-width: 1000px;
@@ -185,10 +184,7 @@ custom_css = """
 }
 """
 
-# 在创建界面之前设置MCP环境变量
-os.environ["GRADIO_MCP_SERVER"] = "True"
-
-# 创建Gradio界面
+# 保持美化的Gradio界面
 with gr.Blocks(
     title="VibeDoc - MCP开发计划生成器",
     theme=gr.themes.Soft(primary_hue="blue"),
@@ -336,40 +332,5 @@ with gr.Blocks(
         outputs=[download_file]
     )
 
-# 启动应用
-if __name__ == "__main__":
-    # 确保MCP环境变量设置
-    os.environ["GRADIO_MCP_SERVER"] = "True"
-    
-    # 检测运行环境
-    is_modelscope = "MODELSCOPE" in os.environ or os.environ.get("MODELSCOPE_ENVIRONMENT") == "studio"
-    
-    try:
-        if is_modelscope:
-            # ModelScope环境：启用MCP Server模式
-            demo.launch(
-                server_name="0.0.0.0",
-                server_port=7860,
-                share=False,
-                quiet=True,
-                show_error=False,
-                mcp_server=True,  # 显式启用MCP
-                max_threads=4
-            )
-        else:
-            # 本地环境
-            demo.launch(
-                server_name="127.0.0.1",
-                server_port=7860,
-                share=True,
-                mcp_server=True  # 显式启用MCP
-            )
-            
-    except Exception as e:
-        logger.error(f"启动失败: {e}")
-        # 降级启动（不使用MCP）
-        demo.launch(
-            server_name="0.0.0.0",
-            server_port=7860,
-            quiet=True
-        )
+# 学习您工作项目的简单直接启动方式
+demo.launch(mcp_server=True)
