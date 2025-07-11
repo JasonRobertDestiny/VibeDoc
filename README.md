@@ -3,16 +3,16 @@ title: VibeDoc - AI驱动的开发计划生成器
 emoji: 🚀
 colorFrom: blue
 colorTo: purple
-sdk: docker
-app_port: 3000
+sdk: gradio
+sdk_version: 4.44.0
+app_file: app.py
 pinned: true
-license: mit
+license: apache-2.0
 tags:
   - AI
   - MCP Server
   - Development Planning
-  - Next.js
-  - TypeScript
+  - Gradio
   - Silicon Flow
 short_description: 🔥 一键将创意转化为完整开发方案！AI驱动的智能开发计划生成器，参赛魔搭AI Hackathon 2025 MCP Server开发赛道
 ---
