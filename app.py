@@ -93,25 +93,6 @@ def generate_development_plan(user_idea: str) -> str:
     except Exception as e:
         return f"❌ 处理错误: {str(e)}"
 
-def download_as_file(content, filename, format_type):
-    """生成下载链接"""
-    if format_type == "markdown":
-        extension = ".md"
-    elif format_type == "txt":
-        extension = ".txt"
-    elif format_type == "json":
-        extension = ".json"
-        # 将markdown转为JSON格式
-        content = json.dumps({"title": filename, "content": content, "created_at": datetime.now().isoformat()}, ensure_ascii=False, indent=2)
-    
-    # 创建临时文件
-    import tempfile
-    temp_file = tempfile.NamedTemporaryFile(mode='w', suffix=extension, delete=False, encoding='utf-8')
-    temp_file.write(content)
-    temp_file.close()
-    
-    return temp_file.name
-
 # 自定义CSS - 保持美化UI
 custom_css = """
 .main-container {
@@ -243,15 +224,10 @@ with gr.Blocks(
             elem_id="plan_result"
         )
         
-        # 操作按钮区域
+        # 简化操作按钮 - 只保留复制功能，移除下载避免安全问题
         with gr.Row():
             copy_btn = gr.Button("📋 复制内容", size="sm", variant="secondary")
-            download_md_btn = gr.Button("📥 下载 Markdown", size="sm", variant="secondary") 
-            download_txt_btn = gr.Button("📄 下载 文本", size="sm", variant="secondary")
-            download_json_btn = gr.Button("📦 下载 JSON", size="sm", variant="secondary")
-        
-        # 下载文件组件（隐藏）
-        download_file = gr.File(visible=False)
+            share_btn = gr.Button("🔗 分享链接", size="sm", variant="secondary")
     
     # 示例区域
     gr.Markdown("## 🎯 快速开始示例")
@@ -267,33 +243,15 @@ with gr.Blocks(
         examples_per_page=4
     )
     
-    # 绑定事件
-    def handle_generate(user_idea):
-        result = generate_development_plan(user_idea)
-        return result
-    
-    def handle_download(plan_content, format_type):
-        if plan_content and "AI生成的完整开发计划将在这里显示" not in plan_content:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"VibeDoc_开发计划_{timestamp}"
-            
-            try:
-                temp_path = download_as_file(plan_content, filename, format_type)
-                return gr.update(value=temp_path, visible=True)
-            except Exception as e:
-                logger.error(f"下载失败: {e}")
-                return gr.update()
-        return gr.update()
-    
-    # 绑定事件
+    # 绑定事件 - 使用api_name确保MCP识别
     generate_btn.click(
-        fn=handle_generate,
+        fn=generate_development_plan,
         inputs=[idea_input],
         outputs=[plan_output],
-        api_name="generate_plan"
+        api_name="generate_plan"  # 确保MCP识别主函数
     )
     
-    # 复制按钮（使用JavaScript）
+    # 复制按钮（使用JavaScript）- 不使用api_name避免暴露为MCP工具
     copy_btn.click(
         fn=lambda content: None,
         inputs=[plan_output],
@@ -313,23 +271,17 @@ with gr.Blocks(
         """
     )
     
-    # 下载按钮
-    download_md_btn.click(
-        fn=lambda content: handle_download(content, "markdown"),
-        inputs=[plan_output],
-        outputs=[download_file]
-    )
+    # 分享功能 - 生成分享链接
+    def handle_share(content):
+        if content and "AI生成的完整开发计划将在这里显示" not in content:
+            # 返回分享提示
+            return "💡 您可以复制当前页面URL或内容进行分享"
+        return "⚠️ 请先生成开发计划"
     
-    download_txt_btn.click(
-        fn=lambda content: handle_download(content, "txt"),
+    share_btn.click(
+        fn=handle_share,
         inputs=[plan_output],
-        outputs=[download_file]
-    )
-    
-    download_json_btn.click(
-        fn=lambda content: handle_download(content, "json"),
-        inputs=[plan_output],
-        outputs=[download_file]
+        outputs=[gr.Textbox(label="分享提示", visible=True)]
     )
 
 # 学习您工作项目的简单直接启动方式
