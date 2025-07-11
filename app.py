@@ -836,10 +836,14 @@ with gr.Blocks(
         prompts_for_copy = gr.Textbox(visible=False)
         download_file = gr.File(label="下载开发计划文档", visible=False)
         
-        # 新的交互按钮
+        # 简化的交互按钮 - 暂时移除复制功能以确保兼容性
         with gr.Row():
-            copy_full_button = gr.Button("📋 复制完整内容", variant="secondary")
-            copy_prompts_button = gr.Button("🤖 复制编程提示词", variant="secondary")
+            gr.HTML("""
+            <div style="padding: 10px; background: #e3f2fd; border-radius: 8px; text-align: center;">
+                💡 <strong>使用提示</strong>: 生成结果后，可以手动选择文本进行复制。
+                <br>或者使用下方的下载功能保存为文件。
+            </div>
+            """)
         
     # 示例区域
     gr.Markdown("## 🎯 快速开始示例", elem_id="quick_start_container")
@@ -896,19 +900,6 @@ curl -X POST YOUR_APP_URL/api/generate_plan -H "Content-Type: application/json" 
     ).then(
         fn=lambda: gr.update(visible=True),
         outputs=[download_file]
-    )
-    
-    # 复制按钮事件
-    copy_full_button.click(
-        fn=None,
-        _js="(text) => { navigator.clipboard.writeText(text); alert('✅ 完整内容已复制到剪贴板！'); }",
-        inputs=[plan_output]
-    )
-    
-    copy_prompts_button.click(
-        fn=None,
-        _js="(text) => { navigator.clipboard.writeText(text); alert('🤖 AI编程提示词已复制到剪贴板！\\n\\n可以直接粘贴到Claude Code、GitHub Copilot等AI编程工具中使用。'); }",
-        inputs=[prompts_for_copy]
     )
 
 # 启动应用
