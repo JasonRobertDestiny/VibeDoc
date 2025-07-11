@@ -2,6 +2,8 @@ import gradio as gr
 import requests
 import os
 import logging
+import json
+from datetime import datetime
 
 # 配置简洁日志
 logging.basicConfig(level=logging.WARNING)
@@ -87,191 +89,328 @@ def generate_development_plan(user_idea: str) -> str:
     except Exception as e:
         return f"❌ 处理错误: {str(e)}"
 
-def analyze_project_feasibility(project_description: str, budget: str, timeline: str) -> str:
+def copy_to_clipboard(text):
+    """复制文本到剪贴板的JavaScript函数"""
+    return f"""
+    <script>
+    function copyToClipboard() {{
+        const text = `{text.replace('`', '\\`')}`;
+        navigator.clipboard.writeText(text).then(function() {{
+            alert('✅ 已复制到剪贴板！');
+        }}, function(err) {{
+            console.error('复制失败: ', err);
+            alert('❌ 复制失败，请手动复制');
+        }});
+    }}
+    copyToClipboard();
+    </script>
     """
-    分析项目的可行性，提供技术难度评估和资源需求分析。
+
+def download_as_file(content, filename, format_type):
+    """生成下载链接"""
+    if format_type == "markdown":
+        content_type = "text/markdown"
+        extension = ".md"
+    elif format_type == "txt":
+        content_type = "text/plain"
+        extension = ".txt"
+    elif format_type == "json":
+        content_type = "application/json"
+        extension = ".json"
+        # 将markdown转为JSON格式
+        content = json.dumps({"title": filename, "content": content, "created_at": datetime.now().isoformat()}, ensure_ascii=False, indent=2)
     
-    Args:
-        project_description (str): 项目详细描述
-        budget (str): 预算范围（如：1万以下、1-5万、5万以上）
-        timeline (str): 期望完成时间（如：1个月、3个月、6个月）
-        
-    Returns:
-        str: 项目可行性分析报告，包含技术难度、资源评估和实施建议
-    """
-    if not all([project_description.strip(), budget.strip(), timeline.strip()]):
-        return "❌ 请填写完整的项目信息"
+    # 创建临时文件
+    import tempfile
+    temp_file = tempfile.NamedTemporaryFile(mode='w', suffix=extension, delete=False, encoding='utf-8')
+    temp_file.write(content)
+    temp_file.close()
     
-    prompt = f"""作为技术顾问，分析以下项目的可行性：
+    return temp_file.name
 
-项目描述：{project_description}
-预算范围：{budget}
-完成时间：{timeline}
+# 自定义CSS
+custom_css = """
+.main-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
 
-请提供：
-## 📊 可行性评估
-- 技术难度等级（1-5星）
-- 开发复杂度分析
+.header-gradient {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+    margin-bottom: 30px;
+}
 
-## 💰 资源需求
-- 人力成本评估
-- 技术成本分析
-- 第三方服务费用
+.content-card {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    margin: 20px 0;
+}
 
-## ⚠️ 风险评估
-- 主要技术风险
-- 时间风险分析
-- 预算超支可能性
+.result-container {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 20px 0;
+    border-left: 4px solid #007bff;
+}
 
-## 💡 优化建议
-- MVP功能建议
-- 成本控制方案
-- 时间管理策略
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+}
 
-## 🎯 实施路径
-- 分阶段开发计划
-- 关键里程碑设定"""
+.btn-copy {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+}
 
-    try:
-        response = requests.post(
-            API_URL,
-            headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-            json={
-                "model": "Qwen/Qwen2.5-72B-Instruct", 
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 2500,
-                "temperature": 0.7
-            },
-            timeout=45
-        )
-        
-        if response.status_code == 200:
-            content = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-            return content if content else "❌ API返回空内容"
-        else:
-            return f"❌ API请求失败: {response.status_code}"
-            
-    except Exception as e:
-        return f"❌ 分析失败: {str(e)}"
+.btn-download {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+}
 
-# 创建简化的Gradio界面
+.btn-copy:hover, .btn-download:hover {
+    opacity: 0.8;
+}
+
+.generate-btn {
+    background: linear-gradient(45deg, #007bff, #0056b3) !important;
+    border: none !important;
+    color: white !important;
+    padding: 15px 30px !important;
+    border-radius: 25px !important;
+    font-weight: bold !important;
+    font-size: 16px !important;
+    transition: all 0.3s ease !important;
+}
+
+.generate-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 20px rgba(0,123,255,0.3) !important;
+}
+
+.tips-box {
+    background: #e3f2fd;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+}
+
+.tips-box h4 {
+    color: #1976d2;
+    margin-bottom: 15px;
+}
+
+.tips-box ul {
+    margin: 10px 0;
+    padding-left: 20px;
+}
+
+.tips-box li {
+    margin: 8px 0;
+    color: #333;
+}
+"""
+
+# 创建Gradio界面
 with gr.Blocks(
     title="VibeDoc - MCP开发计划生成器",
-    theme=gr.themes.Default()
+    theme=gr.themes.Soft(primary_hue="blue"),
+    css=custom_css
 ) as demo:
     
-    gr.Markdown("""
-    # 🚀 VibeDoc - AI驱动的MCP开发计划生成器
+    # 设置MCP服务器环境变量
+    os.environ["GRADIO_MCP_SERVER"] = "True"
     
-    **参赛魔搭AI Hackathon 2025 | MCP Server开发赛道**
-    
-    一键将创意转化为完整的开发方案，支持MCP协议，可被Claude等AI助手调用
-    
-    **✨ 功能特色：**
-    - 🤖 基于Qwen2.5-72B大模型深度分析
-    - 📋 生成完整开发计划和技术方案  
-    - 🔧 原生支持MCP协议
-    - 🚀 一键部署到ModelScope
+    gr.HTML("""
+    <div class="header-gradient">
+        <h1>🚀 VibeDoc - AI开发计划生成器</h1>
+        <p style="font-size: 18px; margin: 15px 0; opacity: 0.95;">
+            基于AI的产品开发计划生成工具，支持MCP协议
+        </p>
+        <p style="opacity: 0.85;">
+            一键将创意转化为完整的开发方案，可被Claude等AI助手调用
+        </p>
+    </div>
     """)
     
-    with gr.Tabs():
-        
-        # Tab 1: 开发计划生成
-        with gr.Tab("💡 创意转开发计划"):
-            gr.Markdown("### 输入您的产品创意，AI将生成完整的开发计划")
+    with gr.Row():
+        with gr.Column(scale=2, elem_classes="content-card"):
+            gr.Markdown("## 💡 输入您的产品创意")
             
             idea_input = gr.Textbox(
-                label="🎯 产品创意描述",
+                label="产品创意描述",
                 placeholder="例如：我想做一个帮助程序员管理代码片段的工具，支持多语言语法高亮，可以按标签分类，还能分享给团队成员...",
-                lines=4
+                lines=5,
+                max_lines=10,
+                show_label=False
             )
             
-            generate_btn = gr.Button("🤖 AI生成开发计划", variant="primary")
-            
-            plan_output = gr.Markdown(
-                label="📋 生成的开发计划",
-                value="💭 AI生成的完整开发计划将在这里显示..."
-            )
-            
-            gr.Examples(
-                examples=[
-                    ["我想开发一个基于AI的代码审查工具，能够自动检测代码质量问题并给出优化建议"],
-                    ["创建一个在线协作的思维导图工具，支持实时编辑和多人同步"],
-                    ["开发一个专门为小团队设计的项目管理平台，集成了时间追踪和报告功能"],
-                    ["制作一个学习编程的互动平台，通过游戏化的方式教授编程概念"]
-                ],
-                inputs=[idea_input]
+            generate_btn = gr.Button(
+                "🤖 AI生成开发计划",
+                variant="primary",
+                size="lg",
+                elem_classes="generate-btn"
             )
         
-        # Tab 2: 可行性分析
-        with gr.Tab("📊 项目可行性分析"):
-            gr.Markdown("### 评估项目的技术难度、资源需求和实施风险")
-            
-            project_desc = gr.Textbox(
-                label="📝 项目详细描述",
-                placeholder="详细描述您的项目需求、功能特性和技术要求...",
-                lines=4
-            )
-            
-            with gr.Row():
-                budget_input = gr.Dropdown(
-                    choices=["1万以下", "1-5万", "5-10万", "10万以上", "预算充足"],
-                    label="💰 预算范围",
-                    value="1-5万"
-                )
-                
-                timeline_input = gr.Dropdown(
-                    choices=["1个月内", "3个月内", "6个月内", "1年内", "时间充裕"], 
-                    label="⏰ 完成时间",
-                    value="3个月内"
-                )
-            
-            analyze_btn = gr.Button("📊 开始可行性分析", variant="secondary")
-            
-            analysis_output = gr.Markdown(
-                label="📊 可行性分析报告",
-                value="📈 详细的项目可行性分析报告将在这里显示..."
-            )
+        with gr.Column(scale=1):
+            gr.HTML("""
+            <div class="tips-box">
+                <h4>💡 创意提示</h4>
+                <ul>
+                    <li>描述核心功能和特性</li>
+                    <li>说明目标用户群体</li>
+                    <li>提及技术偏好或限制</li>
+                    <li>描述主要使用场景</li>
+                    <li>可以包含商业模式想法</li>
+                </ul>
+            </div>
+            """)
     
-    gr.Markdown("""
-    ---
-    ### 🏆 关于VibeDoc MCP Server
+    # 结果显示区域
+    with gr.Column(elem_classes="result-container"):
+        plan_output = gr.Markdown(
+            value="💭 **AI生成的完整开发计划将在这里显示...**\n\n点击上方按钮开始生成您的专属开发计划！",
+            elem_id="plan_result"
+        )
+        
+        # 操作按钮区域
+        with gr.Row():
+            copy_btn = gr.Button("📋 复制内容", size="sm", variant="secondary")
+            download_md_btn = gr.Button("📥 下载 Markdown", size="sm", variant="secondary") 
+            download_txt_btn = gr.Button("📄 下载 文本", size="sm", variant="secondary")
+            download_json_btn = gr.Button("📦 下载 JSON", size="sm", variant="secondary")
+        
+        # 下载文件组件（隐藏）
+        download_file = gr.File(visible=False)
     
-    本项目参加**魔搭AI Hackathon 2025 - MCP Server开发赛道**  
-    支持MCP协议，可被Claude、GPT等AI助手直接调用  
-    *让AI助手拥有专业的产品开发规划能力*
-    """)
+    # 示例区域
+    gr.Markdown("## 🎯 快速开始示例")
+    gr.Examples(
+        examples=[
+            ["我想开发一个基于AI的代码审查工具，能够自动检测代码质量问题并给出优化建议，支持多种编程语言"],
+            ["创建一个在线协作的思维导图工具，支持实时编辑、多人同步、版本控制和导出功能"],
+            ["开发一个专门为小团队设计的项目管理平台，集成时间追踪、报告生成和团队协作功能"],
+            ["制作一个学习编程的互动平台，通过游戏化方式教授编程概念，包含练习和评估系统"]
+        ],
+        inputs=[idea_input],
+        label="点击示例快速开始",
+        examples_per_page=4
+    )
+    
+    # 绑定事件
+    def handle_generate(user_idea):
+        result = generate_development_plan(user_idea)
+        return result
+    
+    def handle_copy(plan_content):
+        if plan_content and "AI生成的完整开发计划将在这里显示" not in plan_content:
+            # 使用JavaScript复制到剪贴板
+            return gr.update(), gr.HTML("""
+            <script>
+            navigator.clipboard.writeText(`""" + plan_content.replace('`', '\\`').replace('\n', '\\n') + """`).then(function() {
+                alert('✅ 内容已复制到剪贴板！');
+            });
+            </script>
+            """)
+        return gr.update(), gr.update()
+    
+    def handle_download(plan_content, format_type):
+        if plan_content and "AI生成的完整开发计划将在这里显示" not in plan_content:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"VibeDoc_开发计划_{timestamp}"
+            
+            try:
+                temp_path = download_as_file(plan_content, filename, format_type)
+                return gr.update(value=temp_path, visible=True)
+            except Exception as e:
+                logger.error(f"下载失败: {e}")
+                return gr.update()
+        return gr.update()
     
     # 绑定事件
     generate_btn.click(
-        fn=generate_development_plan,
+        fn=handle_generate,
         inputs=[idea_input],
         outputs=[plan_output],
         api_name="generate_plan"
     )
     
-    analyze_btn.click(
-        fn=analyze_project_feasibility,
-        inputs=[project_desc, budget_input, timeline_input],
-        outputs=[analysis_output],
-        api_name="analyze_feasibility"
+    # 复制按钮（使用JavaScript）
+    copy_btn.click(
+        fn=lambda content: None,
+        inputs=[plan_output],
+        outputs=[],
+        js="""
+        function(content) {
+            if (content && !content.includes('AI生成的完整开发计划将在这里显示')) {
+                navigator.clipboard.writeText(content).then(function() {
+                    alert('✅ 内容已复制到剪贴板！');
+                }).catch(function(err) {
+                    alert('❌ 复制失败，请手动复制');
+                });
+            } else {
+                alert('⚠️ 请先生成开发计划');
+            }
+        }
+        """
+    )
+    
+    # 下载按钮
+    download_md_btn.click(
+        fn=lambda content: handle_download(content, "markdown"),
+        inputs=[plan_output],
+        outputs=[download_file]
+    )
+    
+    download_txt_btn.click(
+        fn=lambda content: handle_download(content, "txt"),
+        inputs=[plan_output],
+        outputs=[download_file]
+    )
+    
+    download_json_btn.click(
+        fn=lambda content: handle_download(content, "json"),
+        inputs=[plan_output],
+        outputs=[download_file]
     )
 
 # 启动应用
 if __name__ == "__main__":
+    # 设置环境变量启用MCP
+    os.environ["GRADIO_MCP_SERVER"] = "True"
+    
     # 检测运行环境
     is_modelscope = "MODELSCOPE" in os.environ or os.environ.get("MODELSCOPE_ENVIRONMENT") == "studio"
     
     try:
         if is_modelscope:
-            # ModelScope环境：启用MCP Server模式
+            # ModelScope环境
             demo.launch(
                 server_name="0.0.0.0",
                 server_port=7860,
                 share=False,
                 quiet=True,
                 show_error=False,
-                mcp_server=True,  # 启用MCP Server模式
                 max_threads=4
             )
         else:
@@ -279,13 +418,12 @@ if __name__ == "__main__":
             demo.launch(
                 server_name="127.0.0.1",
                 server_port=7860,
-                share=True,
-                mcp_server=True
+                share=True
             )
             
     except Exception as e:
         logger.error(f"启动失败: {e}")
-        # 降级启动（不使用MCP）
+        # 降级启动
         demo.launch(
             server_name="0.0.0.0",
             server_port=7860,
