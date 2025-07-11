@@ -88,6 +88,6 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="blue")
         outputs=plan_output
     )
 
-# 启动Gradio应用，并开启MCP Server功能
+# 启动Gradio应用
 if __name__ == "__main__":
-    demo.launch(mcp_server=True)
+    demo.launch()
