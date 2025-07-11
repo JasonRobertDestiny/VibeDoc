@@ -125,20 +125,6 @@ def format_response(content: str) -> str:
     
     return content
 
-def extract_prompts_for_copy(content: str) -> str:
-    """提取编程提示词部分供单独复制"""
-    lines = content.split('\n')
-    prompts_section = []
-    in_prompts_section = False
-    
-    for line in lines:
-        if "编程提示词" in line or "编程助手" in line or "Prompt" in line:
-            in_prompts_section = True
-        if in_prompts_section:
-            prompts_section.append(line)
-    
-    return '\n'.join(prompts_section) if prompts_section else "请先生成开发计划"
-
 # 自定义CSS - 保持美化UI
 custom_css = """
 .main-container {
@@ -284,10 +270,83 @@ with gr.Blocks(
             elem_id="plan_result"
         )
         
-        # 操作按钮
+        # 操作按钮 - 使用纯JavaScript避免lambda函数暴露
         with gr.Row():
-            copy_plan_btn = gr.Button("📋 复制完整内容", size="sm", variant="secondary")
-            copy_prompts_btn = gr.Button("🤖 复制编程提示词", size="sm", variant="secondary")
+            gr.HTML("""
+            <button onclick="copyFullContent()" style="
+                background: #6c757d;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                margin: 5px;
+                font-size: 14px;
+            ">📋 复制完整内容</button>
+            
+            <button onclick="copyPrompts()" style="
+                background: #28a745;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                margin: 5px;
+                font-size: 14px;
+            ">🤖 复制编程提示词</button>
+            
+            <script>
+            function copyFullContent() {
+                const planResult = document.getElementById('plan_result');
+                if (planResult) {
+                    const content = planResult.innerText || planResult.textContent;
+                    if (content && !content.includes('AI生成的完整开发计划和编程提示词将在这里显示')) {
+                        navigator.clipboard.writeText(content).then(function() {
+                            alert('✅ 完整内容已复制到剪贴板！');
+                        }).catch(function(err) {
+                            alert('❌ 复制失败，请手动复制');
+                        });
+                    } else {
+                        alert('⚠️ 请先生成开发计划');
+                    }
+                }
+            }
+            
+            function copyPrompts() {
+                const planResult = document.getElementById('plan_result');
+                if (planResult) {
+                    const content = planResult.innerText || planResult.textContent;
+                    if (content && !content.includes('AI生成的完整开发计划和编程提示词将在这里显示')) {
+                        const lines = content.split('\\n');
+                        let promptsSection = [];
+                        let inPromptsSection = false;
+                        
+                        for (let line of lines) {
+                            if (line.includes('编程提示词') || line.includes('编程助手') || line.includes('Prompt')) {
+                                inPromptsSection = true;
+                            }
+                            if (inPromptsSection) {
+                                promptsSection.push(line);
+                            }
+                        }
+                        
+                        const promptsText = promptsSection.join('\\n');
+                        if (promptsText.trim()) {
+                            navigator.clipboard.writeText(promptsText).then(function() {
+                                alert('🤖 AI编程提示词已复制到剪贴板！\\n\\n可以直接粘贴到Claude Code、GitHub Copilot等AI编程工具中使用。');
+                            }).catch(function(err) {
+                                alert('❌ 复制失败，请手动复制编程提示词部分');
+                            });
+                        } else {
+                            alert('⚠️ 未找到编程提示词部分，请检查生成的内容');
+                        }
+                    } else {
+                        alert('⚠️ 请先生成开发计划');
+                    }
+                }
+            }
+            </script>
+            """)
     
     # 示例区域
     gr.Markdown("## 🎯 快速开始示例")
@@ -318,71 +377,12 @@ with gr.Blocks(
     </div>
     """)
     
-    # 绑定事件
+    # 绑定事件 - 只有主函数使用api_name
     generate_btn.click(
         fn=generate_development_plan,
         inputs=[idea_input],
         outputs=[plan_output],
-        api_name="generate_plan"  # 确保MCP识别主函数
-    )
-    
-    # 复制完整内容
-    copy_plan_btn.click(
-        fn=lambda content: None,
-        inputs=[plan_output],
-        outputs=[],
-        js="""
-        function(content) {
-            if (content && !content.includes('AI生成的完整开发计划和编程提示词将在这里显示')) {
-                navigator.clipboard.writeText(content).then(function() {
-                    alert('✅ 完整内容已复制到剪贴板！');
-                }).catch(function(err) {
-                    alert('❌ 复制失败，请手动复制');
-                });
-            } else {
-                alert('⚠️ 请先生成开发计划');
-            }
-        }
-        """
-    )
-    
-    # 复制编程提示词部分
-    copy_prompts_btn.click(
-        fn=lambda content: None,
-        inputs=[plan_output],
-        outputs=[],
-        js="""
-        function(content) {
-            if (content && !content.includes('AI生成的完整开发计划和编程提示词将在这里显示')) {
-                // 提取编程提示词部分
-                const lines = content.split('\\n');
-                let promptsSection = [];
-                let inPromptsSection = false;
-                
-                for (let line of lines) {
-                    if (line.includes('编程提示词') || line.includes('编程助手') || line.includes('Prompt')) {
-                        inPromptsSection = true;
-                    }
-                    if (inPromptsSection) {
-                        promptsSection.push(line);
-                    }
-                }
-                
-                const promptsText = promptsSection.join('\\n');
-                if (promptsText.trim()) {
-                    navigator.clipboard.writeText(promptsText).then(function() {
-                        alert('🤖 AI编程提示词已复制到剪贴板！\\n\\n可以直接粘贴到Claude Code、GitHub Copilot等AI编程工具中使用。');
-                    }).catch(function(err) {
-                        alert('❌ 复制失败，请手动复制编程提示词部分');
-                    });
-                } else {
-                    alert('⚠️ 未找到编程提示词部分，请检查生成的内容');
-                }
-            } else {
-                alert('⚠️ 请先生成开发计划');
-            }
-        }
-        """
+        api_name="generate_plan"  # 确保MCP只识别主函数
     )
 
 # 学习您工作项目的简单直接启动方式
