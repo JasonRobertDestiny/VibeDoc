@@ -290,7 +290,32 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
         
     if not API_KEY:
         logger.error("API key not configured")
-        return "❌ 错误：未配置API密钥", "", ""
+        error_msg = """
+## ❌ 配置错误：未设置API密钥
+
+### 🔧 解决方法：
+
+1. **获取API密钥**：
+   - 访问 [Silicon Flow](https://siliconflow.cn) 
+   - 注册账户并获取API密钥
+
+2. **配置环境变量**：
+   ```bash
+   export SILICONFLOW_API_KEY=your_api_key_here
+   ```
+
+3. **魔塔平台配置**：
+   - 在创空间设置中添加环境变量
+   - 变量名：`SILICONFLOW_API_KEY`
+   - 变量值：你的实际API密钥
+
+### 📋 配置完成后重启应用即可使用完整功能！
+
+---
+
+**💡 提示**：API密钥是必填项，没有它就无法调用AI服务生成开发计划。
+"""
+        return error_msg, "", ""
     
     # 获取外部知识库内容
     retrieved_knowledge = fetch_external_knowledge(reference_url)
@@ -1039,12 +1064,14 @@ with gr.Blocks(
             copy_plan_btn = gr.Button(
                 "📋 复制开发计划",
                 variant="secondary",
-                size="sm"
+                size="sm",
+                elem_classes="copy-btn"
             )
             copy_prompts_btn = gr.Button(
                 "🤖 复制编程提示词",
-                variant="secondary",
-                size="sm"
+                variant="secondary", 
+                size="sm",
+                elem_classes="copy-btn"
             )
             
         # 使用提示
