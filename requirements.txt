@@ -1,5 +1,2 @@
-gradio[mcp]==4.44.0
+gradio==4.44.0
 requests==2.31.0
-pydantic==2.5.0
-uvicorn==0.24.0
-httpx==0.25.2

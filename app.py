@@ -75,7 +75,7 @@ def generate_plan(user_idea):
 
     try:
         logger.info("正在调用Silicon Flow API...")
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
         
         # 如果响应不成功，打印详细错误信息
         if response.status_code != 200:
@@ -137,23 +137,11 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="blue")
         api_name="generate_development_plan"
     )
 
-# 启动Gradio应用，启用MCP服务器功能
+# 启动Gradio应用
 if __name__ == "__main__":
     try:
-        # 设置环境变量以启用MCP服务器
-        os.environ["GRADIO_MCP_SERVER"] = "True"
-        logger.info("启动VibeDoc应用，MCP服务器已启用")
-        
-        # 启动应用，设置更合适的配置
-        demo.launch(
-            server_name="0.0.0.0",
-            server_port=7860,
-            share=False,
-            inbrowser=False,
-            quiet=False,
-            show_error=True,
-            mcp_server=True
-        )
+        logger.info("启动VibeDoc应用...")
+        demo.launch()
     except Exception as e:
         logger.error(f"应用启动失败: {e}")
         raise
