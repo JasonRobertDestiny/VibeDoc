@@ -68,6 +68,7 @@ def generate_development_plan(user_idea: str) -> str:
 保持专业且实用，每个部分提供具体可执行的建议。"""
 
     try:
+        # 增加超时时间和重试机制
         response = requests.post(
             API_URL,
             headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
@@ -77,7 +78,7 @@ def generate_development_plan(user_idea: str) -> str:
                 "max_tokens": 3000,
                 "temperature": 0.7
             },
-            timeout=60
+            timeout=120  # 增加到120秒
         )
         
         if response.status_code == 200:
@@ -86,6 +87,10 @@ def generate_development_plan(user_idea: str) -> str:
         else:
             return f"❌ API请求失败: HTTP {response.status_code}"
             
+    except requests.exceptions.Timeout:
+        return "❌ API请求超时，请稍后重试。网络可能较慢，建议检查网络连接。"
+    except requests.exceptions.ConnectionError:
+        return "❌ 网络连接失败，请检查网络设置"
     except Exception as e:
         return f"❌ 处理错误: {str(e)}"
 
@@ -179,6 +184,9 @@ custom_css = """
     color: #333;
 }
 """
+
+# 在创建界面之前设置MCP环境变量
+os.environ["GRADIO_MCP_SERVER"] = "True"
 
 # 创建Gradio界面
 with gr.Blocks(
@@ -330,6 +338,9 @@ with gr.Blocks(
 
 # 启动应用
 if __name__ == "__main__":
+    # 确保MCP环境变量设置
+    os.environ["GRADIO_MCP_SERVER"] = "True"
+    
     # 检测运行环境
     is_modelscope = "MODELSCOPE" in os.environ or os.environ.get("MODELSCOPE_ENVIRONMENT") == "studio"
     
@@ -342,7 +353,7 @@ if __name__ == "__main__":
                 share=False,
                 quiet=True,
                 show_error=False,
-                mcp_server=True,
+                mcp_server=True,  # 显式启用MCP
                 max_threads=4
             )
         else:
@@ -351,7 +362,7 @@ if __name__ == "__main__":
                 server_name="127.0.0.1",
                 server_port=7860,
                 share=True,
-                mcp_server=True
+                mcp_server=True  # 显式启用MCP
             )
             
     except Exception as e:
