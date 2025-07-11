@@ -519,6 +519,25 @@ custom_css = """
     height: 1px;
     margin: 2rem 0;
 }
+
+/* Fix for quick start text contrast */
+#quick_start_container p {
+    color: #4A5568; /* A medium-dark gray for light mode */
+}
+
+.dark #quick_start_container p {
+    color: #E2E8F0; /* A light gray for dark mode */
+}
+
+/* Improve placeholder text contrast in dark mode */
+.dark #plan_output_area textarea::placeholder {
+    color: #9CA3AF !important; /* A slightly darker gray */
+}
+
+/* Improve AI helper text contrast in dark mode */
+.dark #ai_helper_instructions {
+    color: #CBD5E0 !important; /* A light gray */
+}
 """
 
 # 保持美化的Gradio界面
@@ -590,7 +609,7 @@ with gr.Blocks(
     with gr.Column(elem_classes="result-container"):
         plan_output = gr.Markdown(
             value="💭 **AI生成的完整开发计划和编程提示词将在这里显示...**\n\n点击上方按钮开始生成您的专属开发计划和对应的AI编程助手提示词！",
-            elem_id="plan_result"
+            elem_id="plan_output_area"
         )
         
         # 操作按钮 - 使用纯JavaScript避免lambda函数暴露
@@ -672,7 +691,7 @@ with gr.Blocks(
             """)
     
     # 示例区域
-    gr.Markdown("## 🎯 快速开始示例")
+    gr.Markdown("## 🎯 快速开始示例", elem_id="quick_start_container")
     gr.Examples(
         examples=[
             ["我想开发一个基于AI的代码审查工具，能够自动检测代码质量问题并给出优化建议，支持多种编程语言"],
@@ -687,7 +706,7 @@ with gr.Blocks(
     
     # 使用说明
     gr.HTML("""
-    <div class="prompts-section">
+    <div class="prompts-section" id="ai_helper_instructions">
         <h3>🤖 AI编程助手使用说明</h3>
         <p><strong>生成的编程提示词可以直接用于：</strong></p>
         <ul>
