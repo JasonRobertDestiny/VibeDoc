@@ -3,16 +3,19 @@ title: VibeDoc - AI驱动的开发计划生成器
 emoji: 🚀
 colorFrom: blue
 colorTo: purple
-sdk: docker
-pinned: true
+sdk: gradio
+sdk_version: 4.44.0
+app_file: app.py
+pinned: false
 license: mit
+python_version: 3.9
+short_description: AI-powered development plan generator for MCP Server track
 tags:
-  - AI
-  - MCP Server
-  - Development Planning
-  - Next.js
-  - TypeScript
-  - Silicon Flow
+  - ai-hackathon-2025
+  - mcp-server
+  - development-planning
+  - gradio
+  - ai-assistant
 short_description: 基于AI的智能开发计划生成工具，参赛魔搭AI Hackathon 2025 MCP Server开发赛道
 ---
 
