@@ -1,9 +1,43 @@
+# Python缓存
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
 env/
+venv/
+.env
+.venv/
+
+# 测试文件
+test_*.py
+debug_*.py
+validate_*.py
+deployment_check.py
+
+# 结果文件
+result*.txt
+*.log
+vlog.log
+
+# 临时文件
+*_backup.py
+*_optimized.py
+*.tmp
+.DS_Store
+
+# 开发文档
+develop.md
+OPTIMIZATION_*.md
+ui_enhancements.html
+
+# 配置文件
+configuration.json
+
+# 图片文件（如果不需要）
+image*.png
+
+# 标准Python忽略文件
 pip-log.txt
 pip-delete-this-directory.txt
 .tox
@@ -13,12 +47,18 @@ pip-delete-this-directory.txt
 nosetests.xml
 coverage.xml
 *.cover
-*.log
 .git
 .mypy_cache
 .pytest_cache
 .hypothesis
-.DS_Store
-.env
+
+# IDE文件
+.vscode/
+.idea/
 *.swp
 *.swo
+*~
+
+# 系统文件
+Thumbs.db
+Desktop.ini

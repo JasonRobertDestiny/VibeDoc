@@ -320,14 +320,17 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
     # 获取外部知识库内容
     retrieved_knowledge = fetch_external_knowledge(reference_url)
     
-    # 构建系统提示词
-    system_prompt = """你是一个资深技术项目经理，精通产品规划和 AI 编程助手（如 GitHub Copilot、ChatGPT Code）提示词撰写。当收到一个产品创意时，你要：
+    # 构建系统提示词 - 改进版本，明确要求使用外部参考
+    system_prompt = """你是一个资深技术项目经理，精通产品规划和 AI 编程助手（如 GitHub Copilot、ChatGPT Code）提示词撰写。
 
-1. 生成一个详细的开发计划（Markdown 格式，包含功能、技术栈、时间节点等）
-2. 针对计划中的每个功能点，生成一条可直接输入给 AI 编程助手的提示词（Prompt），说明要实现的功能、输入输出、关键依赖等
+🔴 重要要求：
+1. 当收到外部知识库参考时，你必须在开发计划中明确引用和融合这些信息
+2. 必须在开发计划的开头部分提及参考来源（如CSDN博客、GitHub项目等）
+3. 必须根据外部参考调整技术选型和实施建议
+4. 必须在相关章节中使用"参考XXX建议"等表述
 
 请输出结构化的内容，包含：
-- 完整的开发计划（Markdown格式）
+- 完整的开发计划（Markdown格式，必须融合外部参考）
 - 对应的AI编程助手提示词列表
 
 格式要求：先输出开发计划，然后输出编程提示词部分。"""
