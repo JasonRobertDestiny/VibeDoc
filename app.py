@@ -662,10 +662,12 @@ def format_response(content: str) -> str:
     return formatted_content
 
 def enhance_prompts_display(prompts_content: str) -> str:
-    """美化AI编程提示词显示"""
+    """美化AI编程提示词显示，为每个提示词添加复制按钮"""
     lines = prompts_content.split('\n')
     enhanced_lines = []
     in_code_block = False
+    current_prompt_id = 0
+    current_prompt_content = ""
     
     for line in lines:
         stripped = line.strip()
@@ -684,6 +686,7 @@ def enhance_prompts_display(prompts_content: str) -> str:
         # 处理二级标题（功能模块）
         if stripped.startswith('## ') and not in_code_block:
             title = stripped[3:].strip()
+            current_prompt_id += 1
             enhanced_lines.append('')
             enhanced_lines.append('<div class="prompt-section">')
             enhanced_lines.append('')
@@ -694,21 +697,42 @@ def enhance_prompts_display(prompts_content: str) -> str:
         # 处理代码块开始
         if stripped.startswith('```') and not in_code_block:
             in_code_block = True
+            current_prompt_content = ""  # 开始收集提示词内容
             enhanced_lines.append('')
             enhanced_lines.append('<div class="prompt-code-block">')
             enhanced_lines.append('')
             enhanced_lines.append('```prompt')
             continue
             
+        # 处理代码块内容
+        if in_code_block and not stripped.startswith('```'):
+            current_prompt_content += line + '\n'
+            enhanced_lines.append(line)
+            continue
+            
         # 处理代码块结束
         if stripped.startswith('```') and in_code_block:
             in_code_block = False
+            # 添加复制按钮
+            clean_prompt = current_prompt_content.strip()
+            # 安全地编码内容，避免JavaScript注入
+            import html
+            encoded_prompt = html.escape(clean_prompt).replace('\n', '\\n').replace("'", "\\'")
+            
             enhanced_lines.append('```')
             enhanced_lines.append('')
+            enhanced_lines.append('<div class="prompt-copy-section">')
+            enhanced_lines.append(f'<button class="individual-copy-btn" data-prompt-id="{current_prompt_id}" data-prompt-content="{encoded_prompt}">')
+            enhanced_lines.append('    📋 复制此提示词')
+            enhanced_lines.append('</button>')
+            enhanced_lines.append('<span class="copy-success-msg" id="copy-success-' + str(current_prompt_id) + '" style="display: none; color: #28a745; margin-left: 10px;">✅ 已复制!</span>')
             enhanced_lines.append('</div>')
             enhanced_lines.append('')
             enhanced_lines.append('</div>')
             enhanced_lines.append('')
+            enhanced_lines.append('</div>')
+            enhanced_lines.append('')
+            current_prompt_content = ""
             continue
             
         # 其他内容保持原样
@@ -1350,6 +1374,68 @@ custom_css = """
     background: #4a5568;
 }
 
+/* 单独复制按钮样式 */
+.prompt-copy-section {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin: 1rem 0;
+    padding: 0.5rem;
+    background: rgba(66, 153, 225, 0.05);
+    border-radius: 0.5rem;
+}
+
+.individual-copy-btn {
+    background: linear-gradient(45deg, #4299e1, #3182ce) !important;
+    border: none !important;
+    color: white !important;
+    padding: 0.6rem 1.2rem !important;
+    border-radius: 1.5rem !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 2px 8px rgba(66, 153, 225, 0.3) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+}
+
+.individual-copy-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 15px rgba(66, 153, 225, 0.4) !important;
+    background: linear-gradient(45deg, #3182ce, #2c5aa0) !important;
+}
+
+.individual-copy-btn:active {
+    transform: translateY(0) !important;
+}
+
+.copy-success-msg {
+    font-size: 0.85rem;
+    font-weight: 600;
+    animation: fadeInOut 2s ease-in-out;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translateX(-10px); }
+    20% { opacity: 1; transform: translateX(0); }
+    80% { opacity: 1; transform: translateX(0); }
+    100% { opacity: 0; transform: translateX(10px); }
+}
+
+.dark .prompt-copy-section {
+    background: rgba(99, 179, 237, 0.1);
+}
+
+.dark .individual-copy-btn {
+    background: linear-gradient(45deg, #63b3ed, #4299e1) !important;
+}
+
+.dark .individual-copy-btn:hover {
+    background: linear-gradient(45deg, #4299e1, #3182ce) !important;
+}
+
 /* Fix accordion height issue - Agent应用架构说明折叠问题 */
 .gradio-accordion {
     transition: all 0.3s ease !important;
@@ -1705,9 +1791,64 @@ with gr.Blocks(
             });
         }
         
+        // 单独复制提示词功能
+        function copyIndividualPrompt(promptId, promptContent) {
+            // 解码HTML实体
+            const decodedContent = promptContent.replace(/\\n/g, '\n').replace(/\\'/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+            
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(decodedContent).then(() => {
+                    showCopySuccess(promptId);
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                    fallbackCopy(decodedContent);
+                });
+            } else {
+                fallbackCopy(decodedContent);
+            }
+        }
+        
+        // 降级复制方案
+        function fallbackCopy(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert('✅ 提示词已复制到剪贴板！');
+            } catch (err) {
+                alert('❌ 复制失败，请手动选择文本复制');
+            }
+            document.body.removeChild(textArea);
+        }
+        
+        // 显示复制成功提示
+        function showCopySuccess(promptId) {
+            const successMsg = document.getElementById('copy-success-' + promptId);
+            if (successMsg) {
+                successMsg.style.display = 'inline';
+                setTimeout(() => {
+                    successMsg.style.display = 'none';
+                }, 2000);
+            }
+        }
+        
+        // 绑定复制按钮事件
+        function bindCopyButtons() {
+            document.querySelectorAll('.individual-copy-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const promptId = this.getAttribute('data-prompt-id');
+                    const promptContent = this.getAttribute('data-prompt-content');
+                    copyIndividualPrompt(promptId, promptContent);
+                });
+            });
+        }
+        
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
             updateMermaidTheme();
+            bindCopyButtons();
             
             // 监听主题切换
             const observer = new MutationObserver(function(mutations) {
@@ -1724,6 +1865,21 @@ with gr.Blocks(
                 });
             });
             observer.observe(document.documentElement, { attributes: true });
+            
+            // 监听内容变化，重新绑定复制按钮
+            const contentObserver = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'childList') {
+                        bindCopyButtons();
+                    }
+                });
+            });
+            
+            // 监听plan_result区域的变化
+            const planResult = document.getElementById('plan_result');
+            if (planResult) {
+                contentObserver.observe(planResult, { childList: true, subtree: true });
+            }
         });
     </script>
     """)
