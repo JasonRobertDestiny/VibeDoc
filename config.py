@@ -126,20 +126,20 @@ class AppConfig:
 # 全局配置实例
 config = AppConfig()
 
-# 常用配置常量
+# 常用配置常量 - 使用真实可访问的链接
 EXAMPLE_CONFIGURATIONS = {
     "single_mcp": {
-        "description": "单MCP服务示例 - 贴近大众生活",
+        "description": "单MCP服务示例 - 使用真实链接",
         "examples": [
             {
                 "idea": "开发一个智能投资助手，提供股票基金分析和个性化投资建议",
-                "reference_url": "https://docs.deepwiki.org/finance/investment-analysis",
-                "expected_services": ["deepwiki"]
+                "reference_url": "https://docs.python.org/3/library/sqlite3.html",
+                "expected_services": ["fetch"]
             },
             {
                 "idea": "创建一个在线学习平台，支持课程管理和学习进度跟踪",
-                "reference_url": "https://docs.deepwiki.org/education/online-learning",
-                "expected_services": ["deepwiki"]
+                "reference_url": "https://github.com/microsoft/vscode",
+                "expected_services": ["fetch"]
             }
         ]
     },
@@ -149,27 +149,27 @@ EXAMPLE_CONFIGURATIONS = {
             {
                 "idea": "构建一个智能健康管理系统，包含运动记录和健康分析功能",
                 "reference_url": "https://github.com/microsoft/healthcare-bot",
-                "expected_services": ["fetch", "deepwiki"]
+                "expected_services": ["fetch"]
             },
             {
                 "idea": "开发一个家庭理财规划工具，支持预算管理和投资建议",
                 "reference_url": "https://github.com/firefly-iii/firefly-iii",
-                "expected_services": ["fetch", "deepwiki"]
+                "expected_services": ["fetch"]
             }
         ]
     },
-    "triple_mcp": {
-        "description": "三MCP服务完整协作示例 - 保留一个区块链例子",
+    "no_mcp": {
+        "description": "纯AI生成示例 - 不依赖外部链接",
         "examples": [
             {
                 "idea": "构建数字藏品交易平台，集成NFT展示和社区功能",
-                "reference_url": "https://docs.deepwiki.org/blockchain/nft-marketplace",
-                "expected_services": ["deepwiki", "fetch", "doubao"]
+                "reference_url": "",
+                "expected_services": []
             },
             {
                 "idea": "创建智能教育助手，结合AI答疑和学习资源推荐",
-                "reference_url": "https://docs.deepwiki.org/ai/education-assistant",
-                "expected_services": ["deepwiki", "fetch", "doubao"]
+                "reference_url": "",
+                "expected_services": []
             }
         ]
     }
