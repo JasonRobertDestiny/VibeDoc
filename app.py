@@ -8,33 +8,44 @@ from datetime import datetime
 from typing import Optional, Tuple, Dict, Any
 from urllib.parse import urlparse
 
+# 导入模块化组件
+from config import config
+from mcp_manager import mcp_manager
+
 # 配置日志
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=getattr(logging, config.log_level),
+    format=config.log_format
 )
 logger = logging.getLogger(__name__)
 
-# API配置 - 仅使用环境变量
-API_KEY = os.environ.get("SILICONFLOW_API_KEY")
-API_URL = "https://api.siliconflow.cn/v1/chat/completions"
-DEEPWIKI_SSE_URL = os.environ.get("DEEPWIKI_SSE_URL")
-FETCH_SSE_URL = os.environ.get("FETCH_SSE_URL")
-DOUBAO_SSE_URL = os.environ.get("DOUBAO_SSE_URL")
-DOUBAO_API_KEY = os.environ.get("DOUBAO_API_KEY")
+# API配置
+API_KEY = config.ai_model.api_key
+API_URL = config.ai_model.api_url
 
-# 设置Doubao API Key（应用启动时）
-if DOUBAO_SSE_URL and DOUBAO_API_KEY:
-    logger.info("Setting Doubao API Key on startup...")
+# 应用启动时的初始化
+logger.info("🚀 VibeDoc Agent应用启动")
+logger.info(f"📊 配置摘要: {json.dumps(config.get_config_summary(), ensure_ascii=False, indent=2)}")
+
+# 验证配置
+config_errors = config.validate_config()
+if config_errors:
+    for key, error in config_errors.items():
+        logger.warning(f"⚠️ 配置警告 {key}: {error}")
+
+# 初始化Doubao MCP服务（如果启用）
+doubao_service = config.get_mcp_service("doubao")
+if doubao_service and doubao_service.enabled:
+    logger.info("🎨 初始化Doubao MCP服务...")
     try:
         requests.post(
-            DOUBAO_SSE_URL,
-            json={"action": "set_api_key", "params": {"api_key": DOUBAO_API_KEY}},
+            doubao_service.url,
+            json={"action": "set_api_key", "params": {"api_key": doubao_service.api_key}},
             timeout=10
         )
-        logger.info("Doubao API Key set successfully")
+        logger.info("✅ Doubao API Key设置成功")
     except Exception as e:
-        logger.error(f"Failed to set Doubao API Key: {e}")
+        logger.error(f"❌ Doubao API Key设置失败: {e}")
 
 def validate_input(user_idea: str) -> Tuple[bool, str]:
     """验证用户输入"""
@@ -54,6 +65,10 @@ def validate_url(url: str) -> bool:
     except Exception:
         return False
 
+def get_mcp_status_display() -> str:
+    """获取MCP服务状态显示 - 使用模块化管理器"""
+    return mcp_manager.get_status_summary()
+
 def call_mcp_service(url: str, payload: Dict[str, Any], service_name: str, timeout: int = 30) -> Tuple[bool, str]:
     """统一的MCP服务调用函数
     
@@ -67,7 +82,8 @@ def call_mcp_service(url: str, payload: Dict[str, Any], service_name: str, timeo
         (success, data): 成功标志和返回数据
     """
     try:
-        logger.info(f"Calling {service_name} MCP service...")
+        logger.info(f"🔥 DEBUG: Calling {service_name} MCP service at {url}")
+        logger.info(f"🔥 DEBUG: Payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
         
         response = requests.post(
             url,
@@ -76,78 +92,66 @@ def call_mcp_service(url: str, payload: Dict[str, Any], service_name: str, timeo
             timeout=timeout
         )
         
+        logger.info(f"🔥 DEBUG: Response status: {response.status_code}")
+        logger.info(f"🔥 DEBUG: Response headers: {dict(response.headers)}")
+        
+        try:
+            response_data = response.json()
+            logger.info(f"🔥 DEBUG: Response JSON: {json.dumps(response_data, ensure_ascii=False, indent=2)}")
+        except:
+            response_text = response.text[:1000]  # 只打印前1000个字符
+            logger.info(f"🔥 DEBUG: Response text: {response_text}")
+        
         if response.status_code == 200:
             data = response.json()
+            
+            # 检查多种可能的响应格式
+            content = None
             if "data" in data and data["data"]:
                 content = data["data"]
-                logger.info(f"{service_name} MCP service returned {len(content)} characters")
-                return True, content
+            elif "result" in data and data["result"]:
+                content = data["result"]
+            elif "content" in data and data["content"]:
+                content = data["content"]
+            elif "message" in data and data["message"]:
+                content = data["message"]
             else:
-                logger.warning(f"{service_name} MCP service returned empty data")
-                return False, f"❌ {service_name} MCP返回空数据"
+                # 如果以上都没有，尝试直接使用整个响应
+                content = str(data)
+            
+            if content and len(str(content).strip()) > 10:
+                logger.info(f"✅ {service_name} MCP service returned {len(str(content))} characters")
+                return True, str(content)
+            else:
+                logger.warning(f"⚠️ {service_name} MCP service returned empty or invalid data: {data}")
+                return False, f"❌ {service_name} MCP返回空数据或格式错误"
         else:
-            logger.error(f"{service_name} MCP service failed with status {response.status_code}")
+            logger.error(f"❌ {service_name} MCP service failed with status {response.status_code}")
+            logger.error(f"❌ Response content: {response.text[:500]}")
             return False, f"❌ {service_name} MCP调用失败: HTTP {response.status_code}"
             
     except requests.exceptions.Timeout:
-        logger.error(f"{service_name} MCP service timeout")
+        logger.error(f"⏰ {service_name} MCP service timeout after {timeout}s")
         return False, f"❌ {service_name} MCP调用超时"
-    except requests.exceptions.ConnectionError:
-        logger.error(f"{service_name} MCP service connection failed")
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"🔌 {service_name} MCP service connection failed: {str(e)}")
         return False, f"❌ {service_name} MCP连接失败"
     except Exception as e:
-        logger.error(f"{service_name} MCP service error: {str(e)}")
+        logger.error(f"💥 {service_name} MCP service error: {str(e)}")
         return False, f"❌ {service_name} MCP调用错误: {str(e)}"
 
 def fetch_external_knowledge(reference_url: str) -> str:
-    """获取外部知识库内容"""
+    """获取外部知识库内容 - 使用模块化MCP管理器"""
     if not reference_url or not reference_url.strip():
         return ""
     
-    url = reference_url.strip()
+    success, knowledge = mcp_manager.fetch_knowledge_from_url(reference_url.strip())
     
-    # 验证URL格式
-    if not validate_url(url):
-        logger.warning(f"Invalid URL format: {url}")
-        return "❌ 无效的URL格式"
-    
-    # 智能路由：根据URL类型选择不同的MCP服务
-    if "deepwiki.org" in url:
-        if not DEEPWIKI_SSE_URL:
-            logger.warning("DEEPWIKI_SSE_URL not configured, using enhanced fallback")
-            return generate_enhanced_reference_info(url, "DeepWiki技术文档")
-        
-        payload = {
-            "action": "deepwiki_fetch",
-            "params": {
-                "url": url,
-                "mode": "aggregate"
-            }
-        }
-        
-        success, knowledge = call_mcp_service(DEEPWIKI_SSE_URL, payload, "DeepWiki")
-        if success:
-            return f"📖 **DeepWiki知识**：\n\n{knowledge}"
-        else:
-            return generate_enhanced_reference_info(url, "DeepWiki技术文档", knowledge)
-    
+    if success:
+        return knowledge
     else:
-        if not FETCH_SSE_URL:
-            logger.warning("FETCH_SSE_URL not configured, using enhanced fallback")
-            return generate_enhanced_reference_info(url, "外部参考资料")
-        
-        payload = {
-            "action": "fetch",
-            "params": {
-                "url": url
-            }
-        }
-        
-        success, knowledge = call_mcp_service(FETCH_SSE_URL, payload, "Fetch")
-        if success:
-            return f"🔗 **外部知识**：\n\n{knowledge}"
-        else:
-            return generate_enhanced_reference_info(url, "外部参考资料", knowledge)
+        # 如果MCP调用失败，生成增强的参考信息
+        return generate_enhanced_reference_info(reference_url.strip(), "参考资料", knowledge)
 
 def generate_enhanced_reference_info(url: str, source_type: str, error_msg: str = None) -> str:
     """生成增强的参考信息，当MCP服务不可用时提供有用的上下文"""
@@ -222,12 +226,13 @@ def generate_enhanced_reference_info(url: str, source_type: str, error_msg: str 
     return reference_info
 
 def generate_concept_logo(user_idea: str) -> str:
-    """生成概念LOGO"""
-    if not DOUBAO_SSE_URL or not DOUBAO_API_KEY:
+    """生成概念LOGO - 使用模块化配置"""
+    doubao_service = config.get_mcp_service("doubao")
+    if not doubao_service or not doubao_service.enabled:
         return ""
     
     try:
-        logger.info("Generating concept logo with Doubao...")
+        logger.info("🎨 使用Doubao MCP生成概念logo...")
         
         # 创建图像提示词
         image_prompt = f"Logo for a new app: {user_idea}, minimalist, vector art, clean background"
@@ -243,9 +248,9 @@ def generate_concept_logo(user_idea: str) -> str:
         
         # 调用Doubao text_to_image
         image_response = requests.post(
-            DOUBAO_SSE_URL,
+            doubao_service.url,
             json=image_payload,
-            timeout=30
+            timeout=doubao_service.timeout
         )
         
         if image_response.status_code == 200:
@@ -254,21 +259,21 @@ def generate_concept_logo(user_idea: str) -> str:
             if "result" in image_data and image_data["result"] and len(image_data["result"]) > 0:
                 image_url = image_data["result"][0].get("url", "")
                 if image_url:
-                    logger.info("Concept logo generated successfully")
+                    logger.info("✅ 概念logo生成成功")
                     return f"\n\n---\n\n## 🎨 概念LOGO\n![Concept Logo]({image_url})"
                 else:
-                    logger.warning("No image URL found in response")
+                    logger.warning("⚠️ 响应中未找到图像URL")
             else:
-                logger.warning("Invalid image generation response format")
+                logger.warning("⚠️ 图像生成响应格式无效")
         else:
-            logger.error(f"Image generation failed: HTTP {image_response.status_code}")
+            logger.error(f"❌ 图像生成失败: HTTP {image_response.status_code}")
             
     except requests.exceptions.Timeout:
-        logger.error("Image generation timeout")
+        logger.error("⏰ 图像生成超时")
     except requests.exceptions.ConnectionError:
-        logger.error("Image generation connection failed")
+        logger.error("🔌 图像生成连接失败")
     except Exception as e:
-        logger.error(f"Image generation error: {str(e)}")
+        logger.error(f"💥 图像生成错误: {str(e)}")
     
     return ""
 
@@ -329,9 +334,15 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
 3. 必须根据外部参考调整技术选型和实施建议
 4. 必须在相关章节中使用"参考XXX建议"等表述
 
+🎯 编程提示词格式要求：
+- 编程提示词部分必须是纯文本的prompt，不要包含代码示例
+- 每个提示词要详细描述需求、约束条件和期望输出
+- 格式为：描述 + 具体要求列表 + 输出格式说明
+- 提示词要能直接复制粘贴到AI编程工具中使用
+
 请输出结构化的内容，包含：
 - 完整的开发计划（Markdown格式，必须融合外部参考）
-- 对应的AI编程助手提示词列表
+- 对应的AI编程助手提示词列表（纯prompt格式，不含代码）
 
 格式要求：先输出开发计划，然后输出编程提示词部分。"""
 
@@ -461,77 +472,132 @@ def format_response(content: str) -> str:
 {enhance_markdown_structure(content)}
 """
     
-    # 如果内容中没有明确的编程提示词部分，添加一个格式化的分隔符
-    if "编程提示词" not in content and "编程助手" not in content and "Prompt" not in content:
+    # 如果内容中包含代码示例而不是纯prompt，需要转换格式
+    if "```python" in content or "```jsx" in content or "```javascript" in content:
         formatted_content += """
 
 ---
 
 <div class="section-divider"></div>
 
-# 🤖 AI编程助手提示词
+# 🤖 优化后的AI编程助手提示词
 
 <div class="prompts-highlight">
 
 > 💡 **使用说明**：以下提示词可以直接复制到 Claude Code、GitHub Copilot、ChatGPT 等AI编程工具中使用
 
+⚠️ **注意**：原始输出包含了代码示例，以下是转换为标准prompt格式的版本：
+
 ## 🔧 核心功能开发提示词
 
-```bash
-基于上述开发计划，请为每个主要功能模块生成具体的实现代码。
+```
+请基于上述开发计划，为主要功能模块创建完整的实现代码。
 
-📋 要求：
-• 使用推荐的技术栈
-• 包含完整的错误处理
-• 添加必要的注释和文档
-• 遵循最佳实践和安全规范
-• 确保代码可读性和可维护性
+具体要求：
+1. 使用开发计划中推荐的技术栈
+2. 每个函数都要包含完整的类型注解和文档字符串  
+3. 实现完善的错误处理和异常捕获
+4. 添加单元测试和集成测试
+5. 遵循PEP8代码规范和最佳实践
+6. 包含详细的代码注释说明业务逻辑
+
+输出格式：
+- 完整的可运行代码
+- 必要的依赖安装说明
+- 使用示例和测试用例
 ```
 
 ## 🗄️ 数据库设计提示词
 
-```sql
-根据产品需求设计完整的数据库架构：
+```
+请根据开发计划中的产品需求，设计完整的数据库架构。
 
-📊 包含内容：
-• 实体关系图(ERD)设计
-• 完整的表结构定义(DDL)
-• 索引优化策略
-• 数据迁移和初始化脚本
-• 数据备份和恢复方案
+设计要求：
+1. 创建详细的实体关系图(ERD)
+2. 编写完整的表结构定义SQL(DDL)
+3. 设计合理的索引策略提升查询性能
+4. 创建数据初始化和迁移脚本
+5. 制定数据备份和恢复方案
+6. 考虑数据安全和权限控制
+
+输出内容：
+- ERD图的文字描述
+- 完整的建表SQL语句
+- 索引创建语句
+- 示例数据插入语句
+- 数据库优化建议
 ```
 
 ## 🌐 API接口开发提示词
 
-```javascript
-设计和实现完整的RESTful API接口系统：
+```
+请为项目设计和实现完整的RESTful API接口系统。
 
-🔗 开发要求：
-• 完整的API文档(OpenAPI/Swagger)
-• 详细的请求/响应示例
-• 标准化的错误码定义
-• 完整的接口测试用例
-• API版本控制策略
+开发要求：
+1. 设计符合REST规范的API接口
+2. 使用OpenAPI/Swagger规范编写API文档
+3. 实现标准的HTTP状态码和错误处理
+4. 添加请求参数验证和响应格式统一
+5. 实现JWT认证和权限控制
+6. 编写完整的接口测试用例
+
+交付物：
+- API接口的完整实现代码
+- OpenAPI文档(YAML格式)
+- 接口测试用例
+- 部署和使用说明
+- 性能优化建议
 ```
 
 ## 🎨 前端界面开发提示词
 
-```css
-基于开发计划创建现代化的用户界面：
+```
+请基于开发计划创建现代化的前端用户界面。
 
-🎯 设计目标：
-• 响应式设计，支持多设备
-• 现代化UI组件和交互
-• 无障碍访问支持
-• 性能优化和用户体验
-• 国际化和主题切换
+设计要求：
+1. 实现响应式设计，适配桌面和移动设备
+2. 使用现代化UI组件库(如Material-UI、Ant Design)
+3. 实现流畅的用户交互和动画效果
+4. 支持国际化(i18n)和主题切换
+5. 优化页面加载性能和用户体验
+6. 确保可访问性(a11y)标准
+
+输出内容：
+- 完整的组件代码
+- 样式文件(CSS/SCSS)
+- 状态管理实现
+- 路由配置
+- 性能优化方案
+- 测试用例
+```
+
+## 🧪 测试开发提示词
+
+```
+请为项目创建完整的测试体系。
+
+测试要求：
+1. 编写单元测试覆盖核心业务逻辑
+2. 实现集成测试验证模块间协作
+3. 创建端到端(E2E)测试模拟用户操作
+4. 设置自动化测试流程和CI/CD集成
+5. 实现性能测试和压力测试
+6. 添加代码覆盖率检查
+
+交付内容：
+- 完整的测试代码
+- 测试配置文件
+- 测试数据和Mock设置
+- 自动化测试脚本
+- 测试报告模板
+- 测试最佳实践文档
 ```
 
 </div>
 
 ---
 
-**💡 提示：** 将上述任一提示词复制到AI编程工具中，即可获得针对性的代码实现方案！
+**💡 使用提示：** 复制任一提示词到AI编程工具中，它们会根据具体需求生成对应的代码实现！
 """
     
     return formatted_content
@@ -1030,6 +1096,19 @@ with gr.Blocks(
             )
         
         with gr.Column(scale=1):
+            # MCP服务状态监控
+            mcp_status_display = gr.HTML(
+                value=get_mcp_status_display(),
+                label="MCP服务状态"
+            )
+            
+            # 刷新按钮
+            refresh_status_btn = gr.Button(
+                "🔄 刷新状态",
+                variant="secondary",
+                size="sm"
+            )
+            
             gr.HTML("""
             <div class="tips-box">
                 <h4>💡 创意提示</h4>
@@ -1040,12 +1119,13 @@ with gr.Blocks(
                     <li>描述主要使用场景</li>
                     <li>可以包含商业模式想法</li>
                 </ul>
-                <h4>🎯 新增功能</h4>
+                <h4>🎯 MCP服务增强</h4>
                 <ul>
-                    <li>📋 完整开发计划</li>
-                    <li>🤖 AI编程助手提示词</li>
-                    <li>📝 可直接用于编程工具</li>
-                    <li>🔗 智能参考链接解析</li>
+                    <li>🔗 支持外部知识链接解析</li>
+                    <li>🧠 多MCP服务智能协作</li>
+                    <li>📚 DeepWiki技术文档集成</li>
+                    <li>🌐 通用网页内容抓取</li>
+                    <li>🎨 AI图像生成(可选)</li>
                 </ul>
             </div>
             """)
@@ -1088,14 +1168,36 @@ with gr.Blocks(
     gr.Markdown("## 🎯 快速开始示例", elem_id="quick_start_container")
     gr.Examples(
         examples=[
-            ["我想开发一个基于AI的代码审查工具，能够自动检测代码质量问题并给出优化建议，支持多种编程语言"],
-            ["创建一个在线协作的思维导图工具，支持实时编辑、多人同步、版本控制和导出功能"],
-            ["开发一个专门为小团队设计的项目管理平台，集成时间追踪、报告生成和团队协作功能"],
-            ["制作一个学习编程的互动平台，通过游戏化方式教授编程概念，包含练习和评估系统"]
+            # 单MCP服务示例 - 展示DeepWiki集成（保留1个区块链例子）
+            [
+                "我想开发一个智能投资助手，能够分析股票、基金数据，提供个性化投资建议和风险评估",
+                "https://docs.deepwiki.org/finance/investment-analysis"
+            ],
+            # 双MCP服务示例 - GitHub + 通用网页协作
+            [
+                "创建一个在线教育平台，支持视频直播、作业批改、学习进度跟踪和师生互动功能",
+                "https://github.com/microsoft/vscode-education"
+            ],
+            # 三MCP服务示例 - 完整MCP生态展示（区块链例子）
+            [
+                "开发一个数字藏品交易平台，支持NFT铸造、拍卖、展示和社区交流功能",
+                "https://docs.deepwiki.org/blockchain/nft-marketplace"
+            ],
+            # 通用网页MCP示例 - 贴近生活
+            [
+                "构建一个智能健康管理系统，包含运动记录、饮食分析、健康报告和医生咨询功能",
+                "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+            ],
+            # 不使用MCP的纯AI示例 - 生活化场景
+            [
+                "设计一个家庭理财助手APP，支持记账、预算规划、投资建议和账单提醒功能",
+                ""
+            ]
         ],
-        inputs=[idea_input],
-        label="点击示例快速开始",
-        examples_per_page=4
+        inputs=[idea_input, reference_url_input],
+        label="🎯 快速体验示例 - 展示不同MCP服务集成效果",
+        examples_per_page=5,
+        elem_id="enhanced_examples"
     )
     
     # 使用说明
@@ -1170,6 +1272,12 @@ VibeDoc 是一个展示 **Agent应用** 能力的典型案例：
         outputs=[download_file]
     )
     
+    # MCP状态刷新
+    refresh_status_btn.click(
+        fn=get_mcp_status_display,
+        outputs=[mcp_status_display]
+    )
+    
     # 复制按钮事件（使用JavaScript实现）
     copy_plan_btn.click(
         fn=None,
@@ -1229,10 +1337,15 @@ VibeDoc 是一个展示 **Agent应用** 能力的典型案例：
         }"""
     )
 
-# 启动应用 - 修正：我们是Agent应用，不是MCP Server
+# 启动应用 - Agent应用模式
 if __name__ == "__main__":
+    logger.info("🚀 启动VibeDoc Agent应用")
+    logger.info(f"🌍 运行环境: {config.environment}")
+    logger.info(f"🔧 启用的MCP服务: {[s.name for s in config.get_enabled_mcp_services()]}")
+    
     demo.launch(
         server_name="0.0.0.0",
-        server_port=3000,
-        share=False
+        server_port=config.port,
+        share=False,
+        show_error=config.debug
     )
