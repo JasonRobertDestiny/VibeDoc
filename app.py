@@ -1273,11 +1273,49 @@ details.gr-accordion:not([open]) {
 }
 
 .dark #plan_result h3 {
-    color: #FFFFFF !important;
+    color: #63B3ED !important;
 }
 
-.dark #plan_result div[style*="background: #edf2f7"] {
-    background: rgba(99, 179, 237, 0.2) !important;
+.dark #plan_result div[style*="background: linear-gradient(90deg"] {
+    background: linear-gradient(90deg, #2D3748 0%, #1A202C 100%) !important;
+    border-left-color: #4FD1C7 !important;
+}
+
+.dark #plan_result div[style*="background: linear-gradient(45deg"] {
+    background: linear-gradient(45deg, #4A5568 0%, #2D3748 100%) !important;
+}
+
+/* Dark模式下的彩色文字优化 */
+.dark #plan_result span[style*="color: #e53e3e"] {
+    color: #FC8181 !important;
+}
+
+.dark #plan_result span[style*="color: #38a169"] {
+    color: #68D391 !important;
+}
+
+.dark #plan_result span[style*="color: #3182ce"] {
+    color: #63B3ED !important;
+}
+
+.dark #plan_result span[style*="color: #805ad5"] {
+    color: #B794F6 !important;
+}
+
+.dark #plan_result strong[style*="color: #d69e2e"] {
+    color: #F6E05E !important;
+}
+
+.dark #plan_result strong[style*="color: #e53e3e"] {
+    color: #FC8181 !important;
+}
+
+.dark #plan_result p[style*="color: #2c7a7b"] {
+    color: #4FD1C7 !important;
+}
+
+.dark #plan_result p[style*="color: #c53030"] {
+    color: #FC8181 !important;
 }
 
 /* 重点优化：AI编程助手使用说明区域 */
@@ -1477,7 +1515,7 @@ with gr.Blocks(
         with gr.Column(scale=1):
             gr.HTML("""
             <div class="tips-box">
-                <h4>💡 创意提示</h4>
+                <h4 style="color: #e53e3e;">💡 创意提示</h4>
                 <ul>
                     <li>描述核心功能和特性</li>
                     <li>说明目标用户群体</li>
@@ -1485,20 +1523,20 @@ with gr.Blocks(
                     <li>描述主要使用场景</li>
                     <li>可以包含商业模式想法</li>
                 </ul>
-                <h4>🎯 AI增强功能</h4>
+                <h4 style="color: #38a169;">🎯 AI增强功能</h4>
                 <ul>
-                    <li>📋 完整开发计划生成</li>
-                    <li>🤖 AI编程助手提示词</li>
-                    <li>📝 可直接用于编程工具</li>
-                    <li>🔗 智能参考链接解析</li>
-                    <li>🎨 专业文档格式化</li>
+                    <li><span style="color: #e53e3e;">📋</span> 完整开发计划生成</li>
+                    <li><span style="color: #3182ce;">🤖</span> AI编程助手提示词</li>
+                    <li><span style="color: #38a169;">📝</span> 可直接用于编程工具</li>
+                    <li><span style="color: #805ad5;">🔗</span> 智能参考链接解析</li>
+                    <li><span style="color: #d69e2e;">🎨</span> 专业文档格式化</li>
                 </ul>
-                <h4>📖 使用建议</h4>
+                <h4 style="color: #3182ce;">📖 使用建议</h4>
                 <ul>
-                    <li>✍️ 详细描述产品创意(10字以上)</li>
-                    <li>🔗 提供相关参考链接(可选)</li>
-                    <li>🎯 明确目标用户和使用场景</li>
-                    <li>⚡ 30秒即可获得完整方案</li>
+                    <li><span style="color: #e53e3e;">✍️</span> 详细描述产品创意(10字以上)</li>
+                    <li><span style="color: #38a169;">🔗</span> 提供相关参考链接(可选)</li>
+                    <li><span style="color: #805ad5;">🎯</span> 明确目标用户和使用场景</li>
+                    <li><span style="color: #d69e2e;">⚡</span> 30秒即可获得完整方案</li>
                 </ul>
             </div>
             """)
@@ -1509,17 +1547,22 @@ with gr.Blocks(
             value="""
 <div style="text-align: center; padding: 2rem; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border-radius: 1rem; border: 2px dashed #cbd5e0;">
     <div style="font-size: 3rem; margin-bottom: 1rem;">🤖</div>
-    <h3 style="color: #4a5568; margin-bottom: 1rem;">AI开发计划生成器</h3>
-    <p style="color: #718096; font-size: 1.1rem; margin-bottom: 1.5rem;">
-        💭 <strong>输入您的产品创意，AI将生成完整的开发计划和编程提示词</strong>
+    <h3 style="color: #2b6cb0; margin-bottom: 1rem; font-weight: bold;">AI开发计划生成器</h3>
+    <p style="color: #4a5568; font-size: 1.1rem; margin-bottom: 1.5rem;">
+        💭 <strong style="color: #e53e3e;">输入您的产品创意，AI将生成完整的开发计划和编程提示词</strong>
     </p>
-    <div style="background: #edf2f7; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0;">
-        <p style="color: #4a5568; margin: 0;">
-            🎯 <strong>包含：</strong>技术方案 • 开发计划 • 部署策略 • AI编程提示词
+    <div style="background: linear-gradient(90deg, #edf2f7 0%, #e6fffa 100%); padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; border-left: 4px solid #38b2ac;">
+        <p style="color: #2c7a7b; margin: 0; font-weight: 600;">
+            🎯 <strong style="color: #d69e2e;">包含：</strong><span style="color: #e53e3e;">技术方案</span> • <span style="color: #38a169;">开发计划</span> • <span style="color: #3182ce;">部署策略</span> • <span style="color: #805ad5;">AI编程提示词</span>
+        </p>
+    </div>
+    <div style="background: linear-gradient(45deg, #fed7d7 0%, #fbb6ce 100%); padding: 0.8rem; border-radius: 0.5rem; margin: 1rem 0;">
+        <p style="color: #c53030; margin: 0; font-weight: 600;">
+            ⚡ <strong>特色功能：</strong>MCP服务集成 • 个性化提示词 • 专业美化界面
         </p>
     </div>
     <p style="color: #a0aec0; font-size: 0.9rem;">
-        点击上方"🤖 AI生成开发计划 + 编程提示词"按钮开始
+        点击上方 <span style="color: #e53e3e; font-weight: bold;">"🤖 AI生成开发计划 + 编程提示词"</span> 按钮开始
     </p>
 </div>
             """,
