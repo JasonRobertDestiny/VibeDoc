@@ -1875,14 +1875,14 @@ details.gr-accordion:not([open]) {
 
 # 保持美化的Gradio界面
 with gr.Blocks(
-    title="VibeDoc - MCP开发计划生成器",
+    title="VibeDoc Agent：您的随身AI产品经理与架构师",
     theme=gr.themes.Soft(primary_hue="blue"),
     css=custom_css
 ) as demo:
     
     gr.HTML("""
     <div class="header-gradient">
-        <h1>🚀 VibeDoc - AI Agent开发计划生成器</h1>
+        <h1>🚀 VibeDoc Agent：您的随身AI产品经理与架构师</h1>
         <p style="font-size: 18px; margin: 15px 0; opacity: 0.95;">
             基于AI的Agent应用，集成多种MCP服务提供智能开发计划生成
         </p>
