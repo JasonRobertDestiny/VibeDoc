@@ -281,23 +281,61 @@ def generate_enhanced_reference_info(url: str, source_type: str, error_msg: str 
     return reference_info
 
 def generate_concept_logo(user_idea: str) -> str:
-    """生成概念LOGO - 使用模块化配置"""
+    """生成概念LOGO和架构图 - 使用模块化配置"""
     doubao_service = config.get_mcp_service("doubao")
     if not doubao_service or not doubao_service.enabled:
         return ""
     
     try:
-        logger.info("🎨 使用Doubao MCP生成概念logo...")
+        logger.info("🎨 使用Doubao MCP生成概念图像...")
         
-        # 创建图像提示词
-        image_prompt = f"Logo for a new app: {user_idea}, minimalist, vector art, clean background"
+        # 生成多种类型的图像
+        images_generated = []
         
+        # 1. 概念LOGO
+        logo_prompt = f"Logo design for {user_idea}, minimalist, modern, professional, vector style, clean background, high quality"
+        logo_result = generate_image_with_doubao(logo_prompt, "concept-logo", doubao_service)
+        if logo_result:
+            images_generated.append(("🎨 概念LOGO", logo_result))
+        
+        # 2. 系统架构图
+        arch_prompt = f"System architecture diagram for {user_idea}, technical illustration, components and connections, professional style, clean design"
+        arch_result = generate_image_with_doubao(arch_prompt, "architecture", doubao_service)
+        if arch_result:
+            images_generated.append(("🏗️ 系统架构图", arch_result))
+        
+        # 3. 用户界面设计图
+        ui_prompt = f"User interface mockup for {user_idea}, modern UI design, clean layout, professional appearance"
+        ui_result = generate_image_with_doubao(ui_prompt, "ui-design", doubao_service)
+        if ui_result:
+            images_generated.append(("📱 界面设计图", ui_result))
+        
+        # 组装所有生成的图像
+        if images_generated:
+            image_content = "\n\n---\n\n## 🎨 AI生成的概念图像\n\n"
+            for title, url in images_generated:
+                image_content += f"### {title}\n![{title}]({url})\n\n"
+            
+            logger.info(f"✅ 成功生成 {len(images_generated)} 个概念图像")
+            return image_content
+        else:
+            logger.warning("⚠️ 未能生成任何概念图像")
+            return ""
+            
+    except Exception as e:
+        logger.error(f"💥 概念图像生成错误: {str(e)}")
+        return ""
+
+def generate_image_with_doubao(prompt: str, image_type: str, doubao_service) -> str:
+    """使用豆包MCP生成单个图像"""
+    try:
         # 构建Doubao text_to_image调用的JSON载荷
         image_payload = {
             "action": "text_to_image",
             "params": {
-                "prompt": image_prompt,
-                "size": "1024x1024"
+                "prompt": prompt,
+                "size": "1024x1024",
+                "style": "professional"
             }
         }
         
@@ -314,21 +352,21 @@ def generate_concept_logo(user_idea: str) -> str:
             if "result" in image_data and image_data["result"] and len(image_data["result"]) > 0:
                 image_url = image_data["result"][0].get("url", "")
                 if image_url:
-                    logger.info("✅ 概念logo生成成功")
-                    return f"\n\n---\n\n## 🎨 概念LOGO\n![Concept Logo]({image_url})"
+                    logger.info(f"✅ {image_type} 图像生成成功")
+                    return image_url
                 else:
-                    logger.warning("⚠️ 响应中未找到图像URL")
+                    logger.warning(f"⚠️ {image_type} 响应中未找到图像URL")
             else:
-                logger.warning("⚠️ 图像生成响应格式无效")
+                logger.warning(f"⚠️ {image_type} 图像生成响应格式无效")
         else:
-            logger.error(f"❌ 图像生成失败: HTTP {image_response.status_code}")
+            logger.error(f"❌ {image_type} 图像生成失败: HTTP {image_response.status_code}")
             
     except requests.exceptions.Timeout:
-        logger.error("⏰ 图像生成超时")
+        logger.error(f"⏰ {image_type} 图像生成超时")
     except requests.exceptions.ConnectionError:
-        logger.error("🔌 图像生成连接失败")
+        logger.error(f"🔌 {image_type} 图像生成连接失败")
     except Exception as e:
-        logger.error(f"💥 图像生成错误: {str(e)}")
+        logger.error(f"💥 {image_type} 图像生成错误: {str(e)}")
     
     return ""
 
@@ -380,7 +418,7 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
     # 获取外部知识库内容
     retrieved_knowledge = fetch_external_knowledge(reference_url)
     
-    # 构建系统提示词 - 防止虚假链接生成，强化编程提示词生成
+    # 构建系统提示词 - 防止虚假链接生成，强化编程提示词生成，增强视觉化内容
     system_prompt = """你是一个资深技术项目经理，精通产品规划和 AI 编程助手（如 GitHub Copilot、ChatGPT Code）提示词撰写。
 
 🔴 重要要求：
@@ -388,6 +426,7 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
 2. 必须在开发计划的开头部分提及参考来源（如CSDN博客、GitHub项目等）
 3. 必须根据外部参考调整技术选型和实施建议
 4. 必须在相关章节中使用"参考XXX建议"等表述
+5. 开发阶段必须有明确编号（第1阶段、第2阶段等）
 
 🚫 严禁行为：
 - 绝对不要编造虚假的链接或参考资料
@@ -399,6 +438,24 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
 - 如果没有提供外部参考，直接基于创意进行分析
 - 只引用用户实际提供的参考链接
 - 当外部知识不可用时，明确说明是基于最佳实践生成
+
+📊 视觉化内容要求（新增）：
+- 必须在技术方案中包含架构图的Mermaid代码
+- 必须在开发计划中包含甘特图的Mermaid代码
+- 必须在功能模块中包含流程图的Mermaid代码
+- 必须包含技术栈对比表格
+- 必须包含项目里程碑时间表
+
+🎯 Mermaid图表格式要求：
+```mermaid
+graph TD
+    A[开始] --> B[需求分析]
+    B --> C[技术选型]
+    C --> D[系统设计]
+    D --> E[开发实施]
+    E --> F[测试部署]
+    F --> G[上线运营]
+```
 
 🎯 AI编程提示词格式要求（重要）：
 - 必须在开发计划后生成专门的"# AI编程助手提示词"部分
@@ -1204,6 +1261,95 @@ custom_css = """
     }
 }
 
+/* Mermaid图表样式优化 */
+.mermaid {
+    background: #f8fafc !important;
+    border: 2px solid #e2e8f0 !important;
+    border-radius: 1rem !important;
+    padding: 1.5rem !important;
+    margin: 1.5rem 0 !important;
+    text-align: center !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+}
+
+.dark .mermaid {
+    background: #2d3748 !important;
+    border-color: #4a5568 !important;
+    color: #f7fafc !important;
+}
+
+/* Mermaid图表容器 */
+.chart-container {
+    background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
+    border: 2px solid #4299e1;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    text-align: center;
+}
+
+.dark .chart-container {
+    background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+    border-color: #63b3ed;
+}
+
+/* 表格样式增强 */
+.enhanced-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    background: white;
+    border-radius: 0.8rem;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.enhanced-table th {
+    background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+    color: white;
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.enhanced-table td {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+}
+
+.enhanced-table tr:nth-child(even) {
+    background: #f8fafc;
+}
+
+.enhanced-table tr:hover {
+    background: #ebf8ff;
+    transform: scale(1.01);
+    transition: all 0.2s ease;
+}
+
+.dark .enhanced-table {
+    background: #2d3748;
+}
+
+.dark .enhanced-table th {
+    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+}
+
+.dark .enhanced-table td {
+    border-bottom-color: #4a5568;
+    color: #f7fafc;
+}
+
+.dark .enhanced-table tr:nth-child(even) {
+    background: #374151;
+}
+
+.dark .enhanced-table tr:hover {
+    background: #4a5568;
+}
+
 /* Fix accordion height issue - Agent应用架构说明折叠问题 */
 .gradio-accordion {
     transition: all 0.3s ease !important;
@@ -1427,6 +1573,39 @@ details.gr-accordion:not([open]) {
     background: #2D3748 !important;
 }
 
+/* 修复具体的文字对比度问题 */
+.dark #input_idea_title {
+    color: #FFFFFF !important;
+}
+
+.dark #input_idea_title h2 {
+    color: #FFFFFF !important;
+}
+
+.dark #download_success_info {
+    background: #2D3748 !important;
+    color: #F7FAFC !important;
+    border: 1px solid #4FD1C7 !important;
+}
+
+.dark #download_success_info strong {
+    color: #68D391 !important;
+}
+
+.dark #download_success_info span {
+    color: #F7FAFC !important;
+}
+
+.dark #usage_tips {
+    background: #2D3748 !important;
+    color: #F7FAFC !important;
+    border: 1px solid #63B3ED !important;
+}
+
+.dark #usage_tips strong {
+    color: #63B3ED !important;
+}
+
 /* Loading spinner */
 .loading-spinner {
     border: 3px solid #f3f3f3;
@@ -1484,11 +1663,74 @@ with gr.Blocks(
             一键将创意转化为完整的开发方案 + AI编程助手提示词，展示Agent应用与MCP服务协作能力
         </p>
     </div>
+    
+    <!-- 添加Mermaid.js支持 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#4299e1',
+                primaryTextColor: '#1a202c',
+                primaryBorderColor: '#3182ce',
+                lineColor: '#4a5568',
+                secondaryColor: '#ebf8ff',
+                tertiaryColor: '#f7fafc'
+            }
+        });
+        
+        // 监听主题变化，动态更新Mermaid主题
+        function updateMermaidTheme() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const theme = isDark ? 'dark' : 'default';
+            mermaid.initialize({ 
+                startOnLoad: true,
+                theme: theme,
+                themeVariables: isDark ? {
+                    primaryColor: '#4a5568',
+                    primaryTextColor: '#f7fafc',
+                    primaryBorderColor: '#63b3ed',
+                    lineColor: '#a0aec0',
+                    secondaryColor: '#2d3748',
+                    tertiaryColor: '#1a202c'
+                } : {
+                    primaryColor: '#4299e1',
+                    primaryTextColor: '#1a202c',
+                    primaryBorderColor: '#3182ce',
+                    lineColor: '#4a5568',
+                    secondaryColor: '#ebf8ff',
+                    tertiaryColor: '#f7fafc'
+                }
+            });
+        }
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            updateMermaidTheme();
+            
+            // 监听主题切换
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                        updateMermaidTheme();
+                        // 重新渲染所有Mermaid图表
+                        setTimeout(() => {
+                            document.querySelectorAll('.mermaid').forEach(element => {
+                                mermaid.init(undefined, element);
+                            });
+                        }, 100);
+                    }
+                });
+            });
+            observer.observe(document.documentElement, { attributes: true });
+        });
+    </script>
     """)
     
     with gr.Row():
         with gr.Column(scale=2, elem_classes="content-card"):
-            gr.Markdown("## 💡 输入您的产品创意")
+            gr.Markdown("## 💡 输入您的产品创意", elem_id="input_idea_title")
             
             idea_input = gr.Textbox(
                 label="产品创意描述",
@@ -1603,8 +1845,8 @@ with gr.Blocks(
             
         # 使用提示
         gr.HTML("""
-        <div style="padding: 10px; background: #e3f2fd; border-radius: 8px; text-align: center;">
-            💡 <strong>使用提示</strong>: 点击上方按钮复制内容到剪贴板，或使用下方下载功能保存为文件。
+        <div style="padding: 10px; background: #e3f2fd; border-radius: 8px; text-align: center; color: #1565c0;" id="usage_tips">
+            💡 <strong style="color: #0d47a1;">使用提示</strong>: 点击上方按钮复制内容到剪贴板，或使用下方下载功能保存为文件。
         </div>
         """)
         
@@ -1709,11 +1951,11 @@ VibeDoc 是一个展示 **Agent应用** 能力的典型案例：
     def show_download_info():
         return gr.update(
             value="""
-            <div style="padding: 10px; background: #e8f5e8; border-radius: 8px; text-align: center; margin: 10px 0;">
-                ✅ <strong>文档已生成！</strong> 您现在可以：
-                <br>• 📋 复制开发计划或编程提示词
-                <br>• 📁 点击下方下载按钮保存文档
-                <br>• 🔄 调整创意重新生成
+            <div style="padding: 10px; background: #e8f5e8; border-radius: 8px; text-align: center; margin: 10px 0; color: #2d5a2d;" id="download_success_info">
+                ✅ <strong style="color: #1a5a1a;">文档已生成！</strong> 您现在可以：
+                <br>• 📋 <span style="color: #2d5a2d;">复制开发计划或编程提示词</span>
+                <br>• 📁 <span style="color: #2d5a2d;">点击下方下载按钮保存文档</span>
+                <br>• 🔄 <span style="color: #2d5a2d;">调整创意重新生成</span>
             </div>
             """,
             visible=True
