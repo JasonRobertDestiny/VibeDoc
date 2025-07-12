@@ -33,8 +33,19 @@ if config_errors:
     for key, error in config_errors.items():
         logger.warning(f"⚠️ 配置警告 {key}: {error}")
 
-# Doubao图像生成服务已移除以提升性能和专注核心功能
-# 保留Mermaid图表生成能力，专注于文档和代码生成
+# 初始化Doubao MCP服务（如果启用）
+doubao_service = config.get_mcp_service("doubao")
+if doubao_service and doubao_service.enabled:
+    logger.info("🎨 初始化Doubao MCP服务...")
+    try:
+        requests.post(
+            doubao_service.url,
+            json={"action": "set_api_key", "params": {"api_key": doubao_service.api_key}},
+            timeout=10
+        )
+        logger.info("✅ Doubao API Key设置成功")
+    except Exception as e:
+        logger.error(f"❌ Doubao API Key设置失败: {e}")
 
 def validate_input(user_idea: str) -> Tuple[bool, str]:
     """验证用户输入"""
@@ -136,28 +147,6 @@ def fetch_external_knowledge(reference_url: str) -> str:
     
     # 验证URL是否可访问
     url = reference_url.strip()
-    
-    # 额外的URL验证 - 防止虚假链接
-    if any(fake_domain in url.lower() for fake_domain in [
-        "example.com", "test.com", "fake.com", "xxx.com", 
-        "docs.deepwiki.org", "api.deepwiki.org"  # 确保不调用不存在的deepwiki链接
-    ]):
-        logger.warning(f"⚠️ 检测到可能的虚假链接: {url}")
-        return f"""
-## ⚠️ 链接验证提醒
-
-**🔗 提供的链接**: {url}
-
-**❌ 链接状态**: 检测到可能的虚假或测试链接
-
-**💡 建议**: 
-- 请提供真实可访问的链接
-- 或者移除参考链接，使用纯AI生成模式
-- AI将基于创意描述生成专业的开发方案
-
----
-"""
-    
     try:
         # 简单的HEAD请求检查URL是否存在
         response = requests.head(url, timeout=5, allow_redirects=True)
@@ -291,14 +280,95 @@ def generate_enhanced_reference_info(url: str, source_type: str, error_msg: str 
     
     return reference_info
 
-# 注释掉豆包图像生成函数，专注核心功能
-# def generate_concept_logo(user_idea: str) -> str:
-#     """生成概念LOGO和架构图 - 已移除以提升速度"""
-#     return ""
-# 
-# def generate_image_with_doubao(prompt: str, image_type: str, doubao_service) -> str:
-#     """使用豆包MCP生成单个图像 - 已移除以提升速度"""
-#     return ""
+def generate_concept_logo(user_idea: str) -> str:
+    """生成概念LOGO和架构图 - 使用模块化配置"""
+    doubao_service = config.get_mcp_service("doubao")
+    if not doubao_service or not doubao_service.enabled:
+        return ""
+    
+    try:
+        logger.info("🎨 使用Doubao MCP生成概念图像...")
+        
+        # 生成多种类型的图像
+        images_generated = []
+        
+        # 1. 概念LOGO
+        logo_prompt = f"Logo design for {user_idea}, minimalist, modern, professional, vector style, clean background, high quality"
+        logo_result = generate_image_with_doubao(logo_prompt, "concept-logo", doubao_service)
+        if logo_result:
+            images_generated.append(("🎨 概念LOGO", logo_result))
+        
+        # 2. 系统架构图
+        arch_prompt = f"System architecture diagram for {user_idea}, technical illustration, components and connections, professional style, clean design"
+        arch_result = generate_image_with_doubao(arch_prompt, "architecture", doubao_service)
+        if arch_result:
+            images_generated.append(("🏗️ 系统架构图", arch_result))
+        
+        # 3. 用户界面设计图
+        ui_prompt = f"User interface mockup for {user_idea}, modern UI design, clean layout, professional appearance"
+        ui_result = generate_image_with_doubao(ui_prompt, "ui-design", doubao_service)
+        if ui_result:
+            images_generated.append(("📱 界面设计图", ui_result))
+        
+        # 组装所有生成的图像
+        if images_generated:
+            image_content = "\n\n---\n\n## 🎨 AI生成的概念图像\n\n"
+            for title, url in images_generated:
+                image_content += f"### {title}\n![{title}]({url})\n\n"
+            
+            logger.info(f"✅ 成功生成 {len(images_generated)} 个概念图像")
+            return image_content
+        else:
+            logger.warning("⚠️ 未能生成任何概念图像")
+            return ""
+            
+    except Exception as e:
+        logger.error(f"💥 概念图像生成错误: {str(e)}")
+        return ""
+
+def generate_image_with_doubao(prompt: str, image_type: str, doubao_service) -> str:
+    """使用豆包MCP生成单个图像"""
+    try:
+        # 构建Doubao text_to_image调用的JSON载荷
+        image_payload = {
+            "action": "text_to_image",
+            "params": {
+                "prompt": prompt,
+                "size": "1024x1024",
+                "style": "professional"
+            }
+        }
+        
+        # 调用Doubao text_to_image
+        image_response = requests.post(
+            doubao_service.url,
+            json=image_payload,
+            timeout=doubao_service.timeout
+        )
+        
+        if image_response.status_code == 200:
+            image_data = image_response.json()
+            # 解析图像URL（根据实际响应格式调整）
+            if "result" in image_data and image_data["result"] and len(image_data["result"]) > 0:
+                image_url = image_data["result"][0].get("url", "")
+                if image_url:
+                    logger.info(f"✅ {image_type} 图像生成成功")
+                    return image_url
+                else:
+                    logger.warning(f"⚠️ {image_type} 响应中未找到图像URL")
+            else:
+                logger.warning(f"⚠️ {image_type} 图像生成响应格式无效")
+        else:
+            logger.error(f"❌ {image_type} 图像生成失败: HTTP {image_response.status_code}")
+            
+    except requests.exceptions.Timeout:
+        logger.error(f"⏰ {image_type} 图像生成超时")
+    except requests.exceptions.ConnectionError:
+        logger.error(f"🔌 {image_type} 图像生成连接失败")
+    except Exception as e:
+        logger.error(f"💥 {image_type} 图像生成错误: {str(e)}")
+    
+    return ""
 
 def generate_development_plan_with_progress(user_idea: str, reference_url: str = "", progress_callback=None) -> Tuple[str, str, str]:
     """
@@ -379,84 +449,45 @@ def generate_development_plan_with_progress(user_idea: str, reference_url: str =
 - 只引用用户实际提供的参考链接
 - 当外部知识不可用时，明确说明是基于最佳实践生成
 
-📊 视觉化内容要求（强制执行）：
-- **必须**在技术方案中包含系统架构图的Mermaid代码
-- **必须**在开发计划中包含项目甘特图的Mermaid代码  
-- **必须**在功能模块中包含业务流程图的Mermaid代码
-- **可选**添加数据库ERD图、API交互图等其他图表
+📊 视觉化内容要求（重要）：
+- 必须在技术方案中包含架构图的Mermaid代码
+- 必须在开发计划中包含甘特图的Mermaid代码  
+- 必须在功能模块中包含流程图的Mermaid代码
 - Mermaid图表必须使用完整的代码块格式
 - 图表语法必须严格符合Mermaid 10.x版本规范
-- 每个图表都要有清晰的标题和说明
 
 🎯 Mermaid图表格式要求（严格执行）：
-
-**系统架构图示例：**
 ```mermaid
-graph TB
-    subgraph "前端层"
-        A[React应用] --> B[用户界面]
-    end
-    subgraph "后端层"
-        C[API服务] --> D[业务逻辑]
-        D --> E[数据访问层]
-    end
-    subgraph "数据层"
-        F[MySQL数据库] --> G[Redis缓存]
-    end
-    B --> C
-    E --> F
-    E --> G
+graph TD
+    A[开始] --> B[需求分析]
+    B --> C[技术选型]
+    C --> D[系统设计]
+    D --> E[开发实施]
+    E --> F[测试部署]
+    F --> G[上线运营]
 ```
 
-**项目甘特图示例：**
+🎯 甘特图格式要求（严格执行）：
 ```mermaid
 gantt
     title 项目开发甘特图
     dateFormat YYYY-MM-DD
     section 需求分析
-    需求调研        :a1, 2024-01-01, 5d
-    需求文档        :a2, after a1, 3d
+    需求分析     :a1, 2024-01-01, 7d
     section 系统设计
-    架构设计        :b1, after a2, 7d
-    数据库设计      :b2, after b1, 3d
+    系统设计     :a2, after a1, 14d
     section 开发实施
-    后端开发        :c1, after b2, 14d
-    前端开发        :c2, after b2, 14d
-    集成测试        :c3, after c1, 5d
-    section 部署运维
-    环境准备        :d1, after c3, 3d
-    正式发布        :d2, after d1, 2d
+    开发实施     :a3, after a2, 28d
+    section 测试部署
+    测试部署     :a4, after a3, 14d
 ```
 
-**业务流程图示例：**
-```mermaid
-flowchart TD
-    A[用户登录] --> B{验证身份}
-    B -->|成功| C[进入主页面]
-    B -->|失败| D[显示错误信息]
-    C --> E[选择功能]
-    E --> F[执行操作]
-    F --> G{操作结果}
-    G -->|成功| H[显示成功信息]
-    G -->|失败| I[显示错误信息]
-    H --> E
-    I --> E
-    D --> A
-```
-
-⚠️ Mermaid语法注意事项（重要）：
+⚠️ Mermaid语法注意事项：
 - 每个代码块必须以 ```mermaid 开头，``` 结尾
 - 甘特图的日期格式必须为 YYYY-MM-DD
-- 流程图节点名称避免使用特殊字符，中文用方括号包围
-- 图表标题要简洁明确，使用title关键字
-- 子图用subgraph定义，提高可读性
-- 箭头和连接线要清晰，使用适当的箭头样式
-
-🎯 图表质量要求：
-- 系统架构图：体现完整的技术栈和组件关系
-- 甘特图：包含详细的时间安排和依赖关系
-- 流程图：展示清晰的业务逻辑和决策路径
-- 所有图表都要与项目内容高度相关，不使用通用模板
+- 流程图节点名称避免使用特殊字符
+- 中文内容用引号包围或使用安全的标识符
+- 图表标题和节点标签要简洁明确
 
 🎯 AI编程提示词格式要求（重要）：
 - 必须在开发计划后生成专门的"# AI编程助手提示词"部分
@@ -569,13 +600,12 @@ src/
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                "max_tokens": 8000,  # 确保完整输出
-                "temperature": 0.5,  # 优化一致性和速度
-                "top_p": 0.85,       # 平衡质量和速度
-                "frequency_penalty": 0.2,  # 减少重复内容
-                "presence_penalty": 0.1    # 提高内容多样性
+                "max_tokens": 6000,  # 增加token数量以确保完整性
+                "temperature": 0.6,  # 降低温度以提高生成速度和一致性
+                "top_p": 0.9,        # 添加top_p参数优化生成质量
+                "frequency_penalty": 0.1  # 减少重复内容
             },
-            timeout=75  # 优化响应时间
+            timeout=90  # 减少超时时间到90秒
         )
         
         if response.status_code == 200:
@@ -585,8 +615,14 @@ src/
                 update_progress(5, "📋 格式化内容", "美化显示效果，优化图表和提示词...")
                 final_plan_text = format_response(content)
                 
-                # 第6步：生成完成 (95%)
-                update_progress(6, "✅ 生成完成", "创建下载文件，准备展示结果...")
+                # 第6步：生成图像和文件 (90%)
+                update_progress(6, "🎨 生成图像", "创建概念图和架构图...")
+                logo_content = generate_concept_logo(user_idea)
+                if logo_content:
+                    final_plan_text += logo_content
+                
+                # 第7步：完成 (100%)
+                update_progress(7, "✅ 生成完成", "创建下载文件，准备展示结果...")
                 temp_file = create_temp_markdown_file(final_plan_text)
                 
                 return final_plan_text, extract_prompts_section(final_plan_text), temp_file
@@ -620,15 +656,16 @@ def generate_with_progress_ui(user_idea: str, reference_url: str = ""):
         (3, "🧠 构建AI提示词", "准备技术分析和代码生成指令...", ["提示词优化", "上下文构建", "参数配置"]),
         (4, "🤖 AI分析生成中", "调用Qwen2.5-72B模型，生成完整技术方案...", ["模型调用", "内容生成", "结构化处理"]),
         (5, "📋 格式化内容", "美化显示效果，优化图表和提示词...", ["内容美化", "图表渲染", "格式优化"]),
-        (6, "✅ 生成完成", "创建下载文件，准备展示结果...", ["文件创建", "最终检查", "结果展示"])
+        (6, "🎨 生成图像", "创建概念图和架构图...", ["图像生成", "架构图", "概念设计"]),
+        (7, "✅ 生成完成", "创建下载文件，准备展示结果...", ["文件创建", "最终检查", "结果展示"])
     ]
     
     def create_progress_html(current_step, task_name, task_details, preview_items):
-        progress_percentage = (current_step / 6) * 100
+        progress_percentage = (current_step / 7) * 100
         
         # 生成步骤指示器
         steps_html = ""
-        for i in range(1, 7):  # 改为6步
+        for i in range(1, 8):
             if i < current_step:
                 status_class = "completed"
                 icon = "✅"
@@ -649,10 +686,10 @@ def generate_with_progress_ui(user_idea: str, reference_url: str = ""):
         # 生成预览列表
         preview_html = ""
         for idx, item in enumerate(preview_items):
-            if idx < len(preview_items) * (current_step - 1) / 6:  # 改为6步
+            if idx < len(preview_items) * (current_step - 1) / 7:
                 item_class = "completed"
                 icon = "✅"
-            elif idx == int(len(preview_items) * (current_step - 1) / 6):
+            elif idx == int(len(preview_items) * (current_step - 1) / 7):
                 item_class = "current"
                 icon = "🔄"
             else:
@@ -669,7 +706,7 @@ def generate_with_progress_ui(user_idea: str, reference_url: str = ""):
         <div class="progress-container" style="display: block;">
             <div class="progress-header">
                 <div class="progress-title">🚀 AI正在为您生成专业开发方案</div>
-                <div class="progress-subtitle">预计还需 {max(0, (7-current_step)*12)} 秒，请稍候...</div>
+                <div class="progress-subtitle">预计还需 {max(0, (8-current_step)*15)} 秒，请稍候...</div>
             </div>
             
             <div class="progress-bar-container">
@@ -718,53 +755,15 @@ def generate_with_progress_ui(user_idea: str, reference_url: str = ""):
 
 def generate_development_plan_gradio(user_idea: str, reference_url: str = ""):
     """
-    Gradio兼容的生成函数 - 增强错误处理
+    Gradio兼容的生成函数
     """
     try:
-        # 优先检查API配置
-        if not API_KEY:
-            error_msg = """
-## ❌ 配置错误：未设置API密钥
-
-### 🔧 解决方法：
-
-1. **获取API密钥**：
-   - 访问 [Silicon Flow](https://siliconflow.cn) 
-   - 注册账户并获取API密钥
-
-2. **魔塔平台配置**：
-   - 在创空间设置中添加环境变量
-   - 变量名：`SILICONFLOW_API_KEY`
-   - 变量值：你的实际API密钥
-
-### 📋 配置完成后重启应用即可使用完整功能！
-
----
-
-**💡 提示**：API密钥是必填项，没有它就无法调用AI服务生成开发计划。
-"""
-            return error_msg, "", "", ""
-        
-        # 调用核心生成函数
+        # 直接调用原始函数
         plan_content, prompts_content, temp_file = generate_development_plan_with_progress(user_idea, reference_url, None)
         # 返回结果时，进度容器应该为空（由JavaScript隐藏）
         return plan_content, prompts_content, temp_file, ""
-        
     except Exception as e:
-        logger.error(f"Generation error: {str(e)}")
-        error_msg = f"""
-## ❌ 生成过程中出现错误
-
-**错误信息**: {str(e)}
-
-### 🔧 可能的解决方法：
-1. **检查网络连接**：确保网络正常
-2. **检查API配置**：确认API密钥正确
-3. **重试操作**：稍后再试
-4. **联系支持**：如问题持续，请联系技术支持
-
----
-"""
+        error_msg = f"❌ 生成过程中出现错误: {str(e)}"
         return error_msg, "", "", ""
 
 def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[str, str, str]:
@@ -2717,7 +2716,8 @@ with gr.Blocks(
             {step: 3, name: "🧠 构建提示词", details: "准备AI分析指令", items: ["提示词优化", "上下文构建", "参数配置"]},
             {step: 4, name: "🤖 AI生成中", details: "调用Qwen2.5-72B生成技术方案", items: ["模型调用", "内容生成", "结构化处理"]},
             {step: 5, name: "📋 格式化", details: "美化显示效果，优化图表", items: ["内容美化", "图表渲染", "格式优化"]},
-            {step: 6, name: "✅ 完成", details: "创建下载文件，准备展示", items: ["文件创建", "最终检查", "结果展示"]}
+            {step: 6, name: "🎨 生成图像", details: "创建概念图和架构图", items: ["图像生成", "架构图", "概念设计"]},
+            {step: 7, name: "✅ 完成", details: "创建下载文件，准备展示", items: ["文件创建", "最终检查", "结果展示"]}
         ];
         
         function createProgressHTML(stepIndex) {
@@ -2831,7 +2831,7 @@ with gr.Blocks(
             
             // 设置定时器更新进度
             const updateProgressStep = () => {
-                const nextInterval = (currentStep === 3) ? 35000 : 8000; // AI生成阶段等待35秒，其他步骤8秒
+                const nextInterval = (currentStep === 3) ? 45000 : 6000; // AI生成阶段等待45秒，其他步骤6秒
                 progressInterval = setTimeout(() => {
                     currentStep++;
                     if (currentStep >= progressSteps.length) {
@@ -2866,17 +2866,11 @@ with gr.Blocks(
             }
         }
         
-        // 确保函数全局可用
-        window.hideProgress = hideProgress;
-        
-        // 在生成开始时显示进度条 - 注册为全局函数
+        // 在生成开始时显示进度条
         function showProgressBeforeGeneration() {
             startProgress();
             return true; // 允许继续执行原函数
         }
-        
-        // 确保函数全局可用
-        window.showProgressBeforeGeneration = showProgressBeforeGeneration;
         
         // 监听主题变化，动态更新Mermaid主题
         function updateMermaidTheme() {
@@ -3023,9 +3017,6 @@ with gr.Blocks(
             forceRerenderMermaidCharts();
             console.log('手动重新渲染Mermaid图表');
         }
-        
-        // 确保函数全局可用
-        window.manualRerenderCharts = manualRerenderCharts;
     </script>
     """)
     
@@ -3093,7 +3084,7 @@ with gr.Blocks(
                 </div>
                 
                 <div class="quick-start">
-                    <div class="start-indicator">⚡ 让想法变成现实</div>
+                    <div class="start-indicator">⚡ 专为开发者设计</div>
                 </div>
             </div>
             """)
@@ -3261,11 +3252,11 @@ with gr.Blocks(
         inputs=[idea_input, reference_url_input],
         outputs=[plan_output, prompts_for_copy, download_file, progress_container],
         api_name="generate_plan",
-        js="(idea, url) => { try { if (typeof showProgressBeforeGeneration === 'function') showProgressBeforeGeneration(); } catch(e) { console.log('Progress function not available:', e); } return [idea, url]; }"
+        js="(idea, url) => { showProgressBeforeGeneration(); return [idea, url]; }"
     ).then(
         fn=lambda: gr.update(visible=True),
         outputs=[download_file],
-        js="() => { try { if (typeof hideProgress === 'function') hideProgress(); } catch(e) { console.log('Hide progress function not available:', e); } }"
+        js="() => { hideProgress(); }"
     ).then(
         fn=show_download_info,
         outputs=[download_info]
@@ -3336,17 +3327,8 @@ with gr.Blocks(
         inputs=[],
         outputs=[],
         js="""() => {
-            try {
-                if (typeof manualRerenderCharts === 'function') {
-                    manualRerenderCharts();
-                    alert('🔄 正在重新渲染Mermaid图表...');
-                } else {
-                    alert('⚠️ 图表渲染功能暂时不可用');
-                }
-            } catch(e) {
-                console.log('Manual rerender function not available:', e);
-                alert('⚠️ 图表渲染功能暂时不可用');
-            }
+            manualRerenderCharts();
+            alert('🔄 正在重新渲染Mermaid图表...');
         }"""
     )
 
