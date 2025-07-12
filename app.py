@@ -2839,11 +2839,17 @@ with gr.Blocks(
             }
         }
         
-        // 在生成开始时显示进度条
+        // 确保函数全局可用
+        window.hideProgress = hideProgress;
+        
+        // 在生成开始时显示进度条 - 注册为全局函数
         function showProgressBeforeGeneration() {
             startProgress();
             return true; // 允许继续执行原函数
         }
+        
+        // 确保函数全局可用
+        window.showProgressBeforeGeneration = showProgressBeforeGeneration;
         
         // 监听主题变化，动态更新Mermaid主题
         function updateMermaidTheme() {
@@ -2990,6 +2996,9 @@ with gr.Blocks(
             forceRerenderMermaidCharts();
             console.log('手动重新渲染Mermaid图表');
         }
+        
+        // 确保函数全局可用
+        window.manualRerenderCharts = manualRerenderCharts;
     </script>
     """)
     
@@ -3057,7 +3066,7 @@ with gr.Blocks(
                 </div>
                 
                 <div class="quick-start">
-                    <div class="start-indicator">⚡ 专为开发者设计</div>
+                    <div class="start-indicator">⚡ 让想法变成现实</div>
                 </div>
             </div>
             """)
@@ -3225,11 +3234,11 @@ with gr.Blocks(
         inputs=[idea_input, reference_url_input],
         outputs=[plan_output, prompts_for_copy, download_file, progress_container],
         api_name="generate_plan",
-        js="(idea, url) => { showProgressBeforeGeneration(); return [idea, url]; }"
+        js="(idea, url) => { try { if (typeof showProgressBeforeGeneration === 'function') showProgressBeforeGeneration(); } catch(e) { console.log('Progress function not available:', e); } return [idea, url]; }"
     ).then(
         fn=lambda: gr.update(visible=True),
         outputs=[download_file],
-        js="() => { hideProgress(); }"
+        js="() => { try { if (typeof hideProgress === 'function') hideProgress(); } catch(e) { console.log('Hide progress function not available:', e); } }"
     ).then(
         fn=show_download_info,
         outputs=[download_info]
@@ -3300,8 +3309,17 @@ with gr.Blocks(
         inputs=[],
         outputs=[],
         js="""() => {
-            manualRerenderCharts();
-            alert('🔄 正在重新渲染Mermaid图表...');
+            try {
+                if (typeof manualRerenderCharts === 'function') {
+                    manualRerenderCharts();
+                    alert('🔄 正在重新渲染Mermaid图表...');
+                } else {
+                    alert('⚠️ 图表渲染功能暂时不可用');
+                }
+            } catch(e) {
+                console.log('Manual rerender function not available:', e);
+                alert('⚠️ 图表渲染功能暂时不可用');
+            }
         }"""
     )
 
