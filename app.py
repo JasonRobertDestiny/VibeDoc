@@ -370,18 +370,24 @@ def generate_image_with_doubao(prompt: str, image_type: str, doubao_service) -> 
     
     return ""
 
-def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[str, str, str]:
+def generate_development_plan_with_progress(user_idea: str, reference_url: str = "", progress_callback=None) -> Tuple[str, str, str]:
     """
-    基于用户创意生成完整的产品开发计划和对应的AI编程助手提示词。
+    基于用户创意生成完整的产品开发计划和对应的AI编程助手提示词，支持进度回调。
     
     Args:
         user_idea (str): 用户的产品创意描述
         reference_url (str): 可选的参考链接
+        progress_callback: 进度回调函数
         
     Returns:
         Tuple[str, str, str]: 开发计划、AI编程提示词、临时文件路径
     """
-    # 验证输入
+    def update_progress(step: int, message: str, details: str = ""):
+        if progress_callback:
+            progress_callback(step, message, details)
+    
+    # 第1步：验证输入 (10%)
+    update_progress(1, "🔍 验证输入信息", "检查创意描述和参考链接...")
     is_valid, error_msg = validate_input(user_idea)
     if not is_valid:
         return error_msg, "", ""
@@ -415,8 +421,12 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
 """
         return error_msg, "", ""
     
-    # 获取外部知识库内容
+    # 第2步：获取外部知识 (25%)
+    update_progress(2, "🌐 获取外部知识", "从参考链接获取技术文档和最佳实践...")
     retrieved_knowledge = fetch_external_knowledge(reference_url)
+    
+    # 第3步：构建AI提示词 (35%)
+    update_progress(3, "🧠 构建AI提示词", "准备技术分析和代码生成指令...")
     
     # 构建系统提示词 - 防止虚假链接生成，强化编程提示词生成，增强视觉化内容
     system_prompt = """你是一个资深技术项目经理，精通产品规划和 AI 编程助手（如 GitHub Copilot、ChatGPT Code）提示词撰写。
@@ -439,14 +449,14 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
 - 只引用用户实际提供的参考链接
 - 当外部知识不可用时，明确说明是基于最佳实践生成
 
-📊 视觉化内容要求（新增）：
+📊 视觉化内容要求（重要）：
 - 必须在技术方案中包含架构图的Mermaid代码
-- 必须在开发计划中包含甘特图的Mermaid代码
+- 必须在开发计划中包含甘特图的Mermaid代码  
 - 必须在功能模块中包含流程图的Mermaid代码
-- 必须包含技术栈对比表格
-- 必须包含项目里程碑时间表
+- Mermaid图表必须使用完整的代码块格式
+- 图表语法必须严格符合Mermaid 10.x版本规范
 
-🎯 Mermaid图表格式要求：
+🎯 Mermaid图表格式要求（严格执行）：
 ```mermaid
 graph TD
     A[开始] --> B[需求分析]
@@ -457,7 +467,7 @@ graph TD
     F --> G[上线运营]
 ```
 
-🎯 甘特图格式要求：
+🎯 甘特图格式要求（严格执行）：
 ```mermaid
 gantt
     title 项目开发甘特图
@@ -472,45 +482,79 @@ gantt
     测试部署     :a4, after a3, 14d
 ```
 
-🎯 必须严格按照Mermaid语法规范生成图表，不能有格式错误
+⚠️ Mermaid语法注意事项：
+- 每个代码块必须以 ```mermaid 开头，``` 结尾
+- 甘特图的日期格式必须为 YYYY-MM-DD
+- 流程图节点名称避免使用特殊字符
+- 中文内容用引号包围或使用安全的标识符
+- 图表标题和节点标签要简洁明确
 
 🎯 AI编程提示词格式要求（重要）：
 - 必须在开发计划后生成专门的"# AI编程助手提示词"部分
 - 每个功能模块必须有一个专门的AI编程提示词
 - 每个提示词必须使用```代码块格式，方便复制
-- 提示词内容要基于具体项目功能，不要使用通用模板
+- 提示词内容要基于具体项目功能，包含详细的技术规范
 - 提示词要详细、具体、可直接用于AI编程工具
 - 必须包含完整的上下文和具体要求
+- 每个提示词都要包含实际的代码示例或结构
 
-🔧 提示词结构要求：
+🔧 提示词结构要求（严格执行）：
 每个提示词使用以下格式：
 
 ## [功能名称]开发提示词
 
 ```
-请为[具体项目名称]开发[具体功能描述]。
+# [具体项目名称] - [功能名称]模块开发
 
-项目背景：
-[基于开发计划的项目背景]
+## 项目背景
+[基于开发计划的项目背景，包含技术栈和架构信息]
 
-功能要求：
-1. [具体要求1]
-2. [具体要求2]
-...
+## 功能需求
+### 核心功能
+1. [具体功能1] - 实现[详细描述]
+2. [具体功能2] - 支持[详细描述]
+3. [具体功能3] - 提供[详细描述]
 
-技术约束：
-- 使用[具体技术栈]
-- 遵循[具体规范]
-- 实现[具体性能要求]
+### 技术要求
+- 框架：[具体框架版本]
+- 数据库：[具体数据库和设计]
+- API：[具体接口规范]
+- 性能：[具体性能指标]
 
-输出要求：
-- 完整可运行代码
-- 详细注释说明
-- 错误处理机制
-- 测试用例
+### 代码结构
+请按以下结构组织代码：
+```
+[目录结构示例]
+src/
+├── [模块名]/
+│   ├── [文件1].js
+│   ├── [文件2].js
+│   └── index.js
 ```
 
-请严格按照此格式生成个性化的编程提示词，确保每个提示词都基于具体项目需求。
+## 实现要求
+1. **代码规范**：遵循[具体编码规范]
+2. **错误处理**：实现完整的try-catch和验证
+3. **测试覆盖**：包含单元测试和集成测试
+4. **文档说明**：添加详细的JSDoc注释
+5. **性能优化**：[具体优化要求]
+
+## 输出要求
+请提供：
+1. 完整的功能实现代码
+2. 配置文件（如有需要）
+3. 测试用例代码
+4. 使用文档和示例
+5. 部署脚本（如有需要）
+
+## 验收标准
+- [ ] 功能完整性：[具体标准]
+- [ ] 代码质量：[具体标准]
+- [ ] 性能指标：[具体标准]
+- [ ] 测试覆盖率：>90%
+```
+
+重要：每个提示词都必须根据具体项目需求定制，包含项目名称、技术栈、具体功能要求等详细信息。避免使用通用模板。
 
 格式要求：先输出开发计划，然后输出编程提示词部分。"""
 
@@ -532,11 +576,19 @@ gantt
     
     user_prompt += """
 1. 详细的开发计划（包含产品概述、技术方案、开发计划、部署方案、推广策略等）
-2. 每个功能模块对应的AI编程助手提示词
+2. 高质量的AI编程助手提示词，必须满足以下要求：
+   - 每个功能模块对应一个详细的编程提示词
+   - 包含具体的项目背景和技术栈信息
+   - 提供详细的功能需求和技术规范
+   - 包含代码结构和目录组织建议
+   - 明确的验收标准和性能指标
+   - 实际可用的代码示例或接口定义
 
-确保提示词具体、可操作，能直接用于AI编程工具。"""
+确保提示词具体、专业、可操作，能直接用于AI编程工具生成高质量代码。"""
 
     try:
+        # 第4步：调用AI API生成方案 (60%)
+        update_progress(4, "🤖 AI分析生成中", "调用Qwen2.5-72B模型，生成完整技术方案...")
         logger.info("Calling AI API for development plan generation...")
         
         response = requests.post(
@@ -548,24 +600,29 @@ gantt
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                "max_tokens": 4000,
-                "temperature": 0.7
+                "max_tokens": 6000,  # 增加token数量以确保完整性
+                "temperature": 0.6,  # 降低温度以提高生成速度和一致性
+                "top_p": 0.9,        # 添加top_p参数优化生成质量
+                "frequency_penalty": 0.1  # 减少重复内容
             },
-            timeout=120
+            timeout=90  # 减少超时时间到90秒
         )
         
         if response.status_code == 200:
             content = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
             if content:
-                # 后处理：确保内容结构化
+                # 第5步：格式化内容 (80%)
+                update_progress(5, "📋 格式化内容", "美化显示效果，优化图表和提示词...")
                 final_plan_text = format_response(content)
                 
-                # 生成概念LOGO图像
+                # 第6步：生成图像和文件 (90%)
+                update_progress(6, "🎨 生成图像", "创建概念图和架构图...")
                 logo_content = generate_concept_logo(user_idea)
                 if logo_content:
                     final_plan_text += logo_content
                 
-                # 创建临时文件
+                # 第7步：完成 (100%)
+                update_progress(7, "✅ 生成完成", "创建下载文件，准备展示结果...")
                 temp_file = create_temp_markdown_file(final_plan_text)
                 
                 return final_plan_text, extract_prompts_section(final_plan_text), temp_file
@@ -585,6 +642,135 @@ gantt
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         return f"❌ 处理错误: {str(e)}", "", ""
+
+def generate_with_progress_ui(user_idea: str, reference_url: str = ""):
+    """
+    带进度显示的UI生成函数
+    """
+    import time
+    from datetime import datetime
+    
+    progress_steps = [
+        (1, "🔍 验证输入信息", "检查创意描述和参考链接...", ["输入验证", "格式检查", "内容分析"]),
+        (2, "🌐 获取外部知识", "从参考链接获取技术文档和最佳实践...", ["链接验证", "内容抓取", "知识提取"]),
+        (3, "🧠 构建AI提示词", "准备技术分析和代码生成指令...", ["提示词优化", "上下文构建", "参数配置"]),
+        (4, "🤖 AI分析生成中", "调用Qwen2.5-72B模型，生成完整技术方案...", ["模型调用", "内容生成", "结构化处理"]),
+        (5, "📋 格式化内容", "美化显示效果，优化图表和提示词...", ["内容美化", "图表渲染", "格式优化"]),
+        (6, "🎨 生成图像", "创建概念图和架构图...", ["图像生成", "架构图", "概念设计"]),
+        (7, "✅ 生成完成", "创建下载文件，准备展示结果...", ["文件创建", "最终检查", "结果展示"])
+    ]
+    
+    def create_progress_html(current_step, task_name, task_details, preview_items):
+        progress_percentage = (current_step / 7) * 100
+        
+        # 生成步骤指示器
+        steps_html = ""
+        for i in range(1, 8):
+            if i < current_step:
+                status_class = "completed"
+                icon = "✅"
+            elif i == current_step:
+                status_class = "active"
+                icon = str(i)
+            else:
+                status_class = "pending"
+                icon = str(i)
+                
+            steps_html += f"""
+            <div class="progress-step {status_class}">
+                <div class="progress-step-circle">{icon}</div>
+                <div class="progress-step-label">第{i}步</div>
+            </div>
+            """
+        
+        # 生成预览列表
+        preview_html = ""
+        for idx, item in enumerate(preview_items):
+            if idx < len(preview_items) * (current_step - 1) / 7:
+                item_class = "completed"
+                icon = "✅"
+            elif idx == int(len(preview_items) * (current_step - 1) / 7):
+                item_class = "current"
+                icon = "🔄"
+            else:
+                item_class = "pending"
+                icon = "⏳"
+                
+            preview_html += f"""
+            <li class="progress-preview-item {item_class}">
+                <span>{icon}</span> {item}
+            </li>
+            """
+        
+        return f"""
+        <div class="progress-container" style="display: block;">
+            <div class="progress-header">
+                <div class="progress-title">🚀 AI正在为您生成专业开发方案</div>
+                <div class="progress-subtitle">预计还需 {max(0, (8-current_step)*15)} 秒，请稍候...</div>
+            </div>
+            
+            <div class="progress-bar-container">
+                <div class="progress-bar" style="width: {progress_percentage}%"></div>
+            </div>
+            
+            <div class="progress-steps">
+                {steps_html}
+            </div>
+            
+            <div class="progress-current-task">
+                <div class="progress-task-name">{task_name}</div>
+                <div class="progress-task-details">{task_details}</div>
+            </div>
+            
+            <div class="progress-preview">
+                <div class="progress-preview-title">🎯 生成内容预览</div>
+                <ul class="progress-preview-list">
+                    {preview_html}
+                </ul>
+            </div>
+        </div>
+        """
+    
+    # 生成器函数，逐步返回进度
+    def progress_generator():
+        for step, task_name, task_details, preview_items in progress_steps:
+            # 创建进度HTML
+            progress_html = create_progress_html(step, task_name, task_details, preview_items)
+            
+            # 模拟处理时间
+            if step == 4:  # AI生成阶段较慢
+                yield (progress_html, "", "", "")
+                time.sleep(2)  # AI调用需要更多时间
+            else:
+                yield (progress_html, "", "", "")
+                time.sleep(1)  # 其他步骤较快
+        
+        # 调用实际的生成函数
+        plan_content, prompts_content, temp_file = generate_development_plan(user_idea, reference_url)
+        
+        # 隐藏进度条，显示结果
+        yield ("", plan_content, prompts_content, temp_file)
+    
+    return progress_generator()
+
+def generate_development_plan_gradio(user_idea: str, reference_url: str = ""):
+    """
+    Gradio兼容的生成函数
+    """
+    try:
+        # 直接调用原始函数
+        plan_content, prompts_content, temp_file = generate_development_plan_with_progress(user_idea, reference_url, None)
+        # 返回结果时，进度容器应该为空（由JavaScript隐藏）
+        return plan_content, prompts_content, temp_file, ""
+    except Exception as e:
+        error_msg = f"❌ 生成过程中出现错误: {str(e)}"
+        return error_msg, "", "", ""
+
+def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[str, str, str]:
+    """
+    原始的开发计划生成函数，保持向后兼容性
+    """
+    return generate_development_plan_with_progress(user_idea, reference_url, None)
 
 def extract_prompts_section(content: str) -> str:
     """从完整内容中提取AI编程提示词部分"""
@@ -694,9 +880,9 @@ def enhance_prompts_display(prompts_content: str) -> str:
             enhanced_lines.append('')
             enhanced_lines.append('<div class="prompts-highlight">')
             enhanced_lines.append('')
-            enhanced_lines.append('# 🤖 AI编程助手提示词')
+            enhanced_lines.append('# 🤖 AI编程提示词')
             enhanced_lines.append('')
-            enhanced_lines.append('> 💡 **使用说明**：以下提示词基于您的项目需求定制生成，可直接复制到 Claude Code、GitHub Copilot、ChatGPT 等AI编程工具中使用')
+            enhanced_lines.append('> 💡 **使用说明**：复制提示词到 Claude Code、GitHub Copilot、ChatGPT 等AI编程工具中使用')
             enhanced_lines.append('')
             continue
             
@@ -1130,6 +1316,232 @@ custom_css = """
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.05); }
 }
+
+/* ========================
+   🔄 进度条系统样式
+   ======================== */
+
+.progress-container {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 2px solid #3b82f6;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin: 2rem 0;
+    display: none;
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+}
+
+.dark .progress-container {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #60a5fa;
+}
+
+.progress-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.progress-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.dark .progress-title {
+    color: #f8fafc;
+}
+
+.progress-subtitle {
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+.dark .progress-subtitle {
+    color: #d1d5db;
+}
+
+.progress-bar-container {
+    background: #e5e7eb;
+    border-radius: 1rem;
+    height: 8px;
+    margin: 1rem 0;
+    overflow: hidden;
+}
+
+.dark .progress-bar-container {
+    background: #374151;
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, #3b82f6, #10b981);
+    height: 100%;
+    border-radius: 1rem;
+    transition: width 0.5s ease;
+    position: relative;
+}
+
+.progress-bar::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.progress-steps {
+    display: flex;
+    justify-content: space-between;
+    margin: 1.5rem 0;
+}
+
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+}
+
+.progress-step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    border: 3px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    transition: all 0.3s ease;
+}
+
+.progress-step.active .progress-step-circle {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: white;
+    animation: pulse 1.5s infinite;
+}
+
+.progress-step.completed .progress-step-circle {
+    background: #10b981;
+    border-color: #10b981;
+    color: white;
+}
+
+.progress-step-label {
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+    text-align: center;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.dark .progress-step-label {
+    color: #d1d5db;
+}
+
+.progress-step.active .progress-step-label {
+    color: #3b82f6;
+    font-weight: 700;
+}
+
+.progress-step.completed .progress-step-label {
+    color: #10b981;
+    font-weight: 700;
+}
+
+.progress-current-task {
+    text-align: center;
+    margin: 1rem 0;
+}
+
+.progress-task-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.dark .progress-task-name {
+    color: #f8fafc;
+}
+
+.progress-task-details {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin-bottom: 1rem;
+}
+
+.dark .progress-task-details {
+    color: #d1d5db;
+}
+
+.progress-preview {
+    background: rgba(59, 130, 246, 0.05);
+    border-radius: 0.8rem;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.dark .progress-preview {
+    background: rgba(96, 165, 250, 0.1);
+}
+
+.progress-preview-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #3b82f6;
+    margin-bottom: 0.5rem;
+}
+
+.dark .progress-preview-title {
+    color: #60a5fa;
+}
+
+.progress-preview-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.progress-preview-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0;
+    font-size: 0.85rem;
+    color: #4b5563;
+}
+
+.dark .progress-preview-item {
+    color: #d1d5db;
+}
+
+.progress-preview-item.completed {
+    color: #10b981;
+}
+
+.progress-preview-item.current {
+    color: #3b82f6;
+    font-weight: 600;
+}
+
+.progress-preview-item.pending {
+    color: #9ca3af;
+}
+
+/* ========================
+   原有样式保持
+   ======================== */
 
 /* ========================
    🎯 标题优化
@@ -2191,14 +2603,12 @@ with gr.Blocks(
     
     gr.HTML("""
     <div class="header-gradient">
-        <h1>🚀 VibeDoc Agent：您的随身AI产品经理与架构师</h1>
-        <p style="font-size: 18px; margin: 15px 0; opacity: 0.95;">
-            基于AI的Agent应用，集成多种MCP服务提供智能开发计划生成
-        </p>
-        <p style="opacity: 0.85;">
-            一键将创意转化为完整的开发方案 + AI编程助手提示词，展示Agent应用与MCP服务协作能力
+        <h1>🚀 VibeDoc Agent</h1>
+        <p style="font-size: 18px; margin: 10px 0; opacity: 0.95;">
+            30秒将创意转化为完整开发方案 + AI编程提示词
         </p>
     </div>
+    
     
     <!-- 添加Mermaid.js支持 -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -2206,6 +2616,20 @@ with gr.Blocks(
         mermaid.initialize({ 
             startOnLoad: true,
             theme: 'default',
+            securityLevel: 'loose',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true
+            },
+            gantt: {
+                useMaxWidth: true,
+                gridLineStartPadding: 350,
+                fontSize: 11,
+                fontFamily: '"Open Sans", sans-serif',
+                sectionFontSize: 24,
+                barHeight: 20,
+                numberSectionStyles: 4
+            },
             themeVariables: {
                 primaryColor: '#3b82f6',
                 primaryTextColor: '#1f2937',
@@ -2220,6 +2644,234 @@ with gr.Blocks(
             }
         });
         
+        // 强制重新渲染所有Mermaid图表的函数
+        function forceRerenderMermaidCharts() {
+            // 等待DOM更新后执行
+            setTimeout(() => {
+                const mermaidElements = document.querySelectorAll('.mermaid');
+                mermaidElements.forEach((element, index) => {
+                    // 清空并重新初始化
+                    element.innerHTML = element.textContent;
+                    element.removeAttribute('data-processed');
+                    
+                    // 为每个图表生成唯一ID
+                    if (!element.id) {
+                        element.id = `mermaid-chart-${Date.now()}-${index}`;
+                    }
+                });
+                
+                // 重新初始化Mermaid
+                mermaid.init(undefined, '.mermaid');
+                
+                // 如果还有未渲染的，再次尝试
+                setTimeout(() => {
+                    const unprocessedElements = document.querySelectorAll('.mermaid:not([data-processed])');
+                    if (unprocessedElements.length > 0) {
+                        mermaid.init(undefined, unprocessedElements);
+                    }
+                }, 1000);
+            }, 500);
+        }
+        
+        // 监听内容变化，自动重新渲染图表
+        function observeContentChanges() {
+            const targetNode = document.getElementById('plan_result');
+            if (!targetNode) return;
+            
+            const observer = new MutationObserver((mutations) => {
+                let shouldRerender = false;
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'childList' || mutation.type === 'characterData') {
+                        const addedNodes = Array.from(mutation.addedNodes);
+                        const hasNewContent = addedNodes.some(node => 
+                            node.nodeType === Node.ELEMENT_NODE && 
+                            (node.textContent.includes('mermaid') || node.querySelector && node.querySelector('.mermaid'))
+                        );
+                        if (hasNewContent) {
+                            shouldRerender = true;
+                        }
+                    }
+                });
+                
+                if (shouldRerender) {
+                    forceRerenderMermaidCharts();
+                }
+            });
+            
+            observer.observe(targetNode, {
+                childList: true,
+                subtree: true,
+                characterData: true
+            });
+        }
+        
+        // 进度条管理
+        let progressContainer = null;
+        let progressInterval = null;
+        let currentStep = 0;
+        
+        const progressSteps = [
+            {step: 1, name: "🔍 验证输入", details: "检查创意描述和参考链接", items: ["输入验证", "格式检查", "内容分析"]},
+            {step: 2, name: "🌐 获取知识", details: "从参考链接获取技术文档", items: ["链接验证", "内容抓取", "知识提取"]},
+            {step: 3, name: "🧠 构建提示词", details: "准备AI分析指令", items: ["提示词优化", "上下文构建", "参数配置"]},
+            {step: 4, name: "🤖 AI生成中", details: "调用Qwen2.5-72B生成技术方案", items: ["模型调用", "内容生成", "结构化处理"]},
+            {step: 5, name: "📋 格式化", details: "美化显示效果，优化图表", items: ["内容美化", "图表渲染", "格式优化"]},
+            {step: 6, name: "🎨 生成图像", details: "创建概念图和架构图", items: ["图像生成", "架构图", "概念设计"]},
+            {step: 7, name: "✅ 完成", details: "创建下载文件，准备展示", items: ["文件创建", "最终检查", "结果展示"]}
+        ];
+        
+        function createProgressHTML(stepIndex) {
+            const step = progressSteps[stepIndex];
+            const progress = ((stepIndex + 1) / progressSteps.length) * 100;
+            const remainingTime = Math.max(0, (progressSteps.length - stepIndex - 1) * 8);
+            
+            // 生成步骤指示器
+            let stepsHTML = '';
+            for (let i = 0; i < progressSteps.length; i++) {
+                let statusClass, icon;
+                if (i < stepIndex) {
+                    statusClass = 'completed';
+                    icon = '✅';
+                } else if (i === stepIndex) {
+                    statusClass = 'active';
+                    icon = (i + 1).toString();
+                } else {
+                    statusClass = 'pending';
+                    icon = (i + 1).toString();
+                }
+                
+                stepsHTML += `
+                <div class="progress-step ${statusClass}">
+                    <div class="progress-step-circle">${icon}</div>
+                    <div class="progress-step-label">第${i + 1}步</div>
+                </div>`;
+            }
+            
+            // 生成预览列表
+            let previewHTML = '';
+            step.items.forEach((item, idx) => {
+                let itemClass, itemIcon;
+                const itemProgress = (stepIndex * step.items.length + idx) / (progressSteps.length * step.items.length);
+                if (itemProgress < (stepIndex / progressSteps.length)) {
+                    itemClass = 'completed';
+                    itemIcon = '✅';
+                } else if (itemProgress <= ((stepIndex + 1) / progressSteps.length)) {
+                    itemClass = 'current';
+                    itemIcon = '🔄';
+                } else {
+                    itemClass = 'pending';
+                    itemIcon = '⏳';
+                }
+                
+                previewHTML += `
+                <li class="progress-preview-item ${itemClass}">
+                    <span>${itemIcon}</span> ${item}
+                </li>`;
+            });
+            
+            return `
+            <div class="progress-container" style="display: block;">
+                <div class="progress-header">
+                    <div class="progress-title">🚀 AI正在生成开发方案</div>
+                    <div class="progress-subtitle">预计还需 ${remainingTime} 秒</div>
+                </div>
+                
+                <div class="progress-bar-container">
+                    <div class="progress-bar" style="width: ${progress}%"></div>
+                </div>
+                
+                <div class="progress-steps">
+                    ${stepsHTML}
+                </div>
+                
+                <div class="progress-current-task">
+                    <div class="progress-task-name">${step.name}</div>
+                    <div class="progress-task-details">${step.details}</div>
+                </div>
+                
+                <div class="progress-preview">
+                    <div class="progress-preview-title">🎯 生成内容预览</div>
+                    <ul class="progress-preview-list">
+                        ${previewHTML}
+                    </ul>
+                </div>
+                
+                <div class="progress-tips" style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.05); border-radius: 0.5rem; border-left: 3px solid #3b82f6;">
+                    <div style="font-size: 0.9rem; color: #4b5563; margin-bottom: 0.5rem;">💡 <strong>生成过程中，您可以：</strong></div>
+                    <div style="font-size: 0.85rem; color: #6b7280; line-height: 1.5;">
+                        • 🔍 了解AI正在分析您的创意需求<br>
+                        • ⚙️ 准备技术栈和开发环境<br>
+                        • 📝 思考项目的具体实施细节<br>
+                        • 🎯 规划后续的开发步骤
+                    </div>
+                </div>
+            </div>`;
+        }
+        
+        function startProgress() {
+            // 隐藏结果区域，显示进度条
+            const planResult = document.getElementById('plan_result');
+            if (planResult) {
+                planResult.style.display = 'none';
+            }
+            
+            // 创建或获取进度容器
+            progressContainer = document.getElementById('progress_container');
+            if (!progressContainer) {
+                progressContainer = document.createElement('div');
+                progressContainer.id = 'progress_container';
+                const resultContainer = document.querySelector('.result-container');
+                if (resultContainer) {
+                    resultContainer.insertBefore(progressContainer, planResult);
+                }
+            }
+            
+            currentStep = 0;
+            updateProgress();
+            
+            // 设置定时器更新进度
+            const updateProgressStep = () => {
+                const nextInterval = (currentStep === 3) ? 45000 : 6000; // AI生成阶段等待45秒，其他步骤6秒
+                progressInterval = setTimeout(() => {
+                    currentStep++;
+                    if (currentStep >= progressSteps.length) {
+                        return;
+                    }
+                    updateProgress();
+                    updateProgressStep(); // 递归调用下一步
+                }, nextInterval);
+            };
+            updateProgressStep();
+        }
+        
+        function updateProgress() {
+            if (progressContainer && currentStep < progressSteps.length) {
+                progressContainer.innerHTML = createProgressHTML(currentStep);
+            }
+        }
+        
+        function hideProgress() {
+            if (progressInterval) {
+                clearTimeout(progressInterval);
+                progressInterval = null;
+            }
+            
+            if (progressContainer) {
+                progressContainer.style.display = 'none';
+            }
+            
+            const planResult = document.getElementById('plan_result');
+            if (planResult) {
+                planResult.style.display = 'block';
+            }
+        }
+        
+        // 在生成开始时显示进度条
+        function showProgressBeforeGeneration() {
+            startProgress();
+            return true; // 允许继续执行原函数
+        }
+        
         // 监听主题变化，动态更新Mermaid主题
         function updateMermaidTheme() {
             const isDark = document.documentElement.classList.contains('dark');
@@ -2227,6 +2879,20 @@ with gr.Blocks(
             mermaid.initialize({ 
                 startOnLoad: true,
                 theme: theme,
+                securityLevel: 'loose',
+                flowchart: {
+                    useMaxWidth: true,
+                    htmlLabels: true
+                },
+                gantt: {
+                    useMaxWidth: true,
+                    gridLineStartPadding: 350,
+                    fontSize: 11,
+                    fontFamily: '"Open Sans", sans-serif',
+                    sectionFontSize: 24,
+                    barHeight: 20,
+                    numberSectionStyles: 4
+                },
                 themeVariables: isDark ? {
                     primaryColor: '#60a5fa',
                     primaryTextColor: '#f8fafc',
@@ -2251,6 +2917,9 @@ with gr.Blocks(
                     tertiaryBkg: '#eff6ff'
                 }
             });
+            
+            // 重新渲染所有图表
+            forceRerenderMermaidCharts();
         }
         
         // 单独复制提示词功能
@@ -2311,28 +2980,27 @@ with gr.Blocks(
         document.addEventListener('DOMContentLoaded', function() {
             updateMermaidTheme();
             bindCopyButtons();
+            observeContentChanges(); // 添加内容变化监听
             
             // 监听主题切换
             const observer = new MutationObserver(function(mutations) {
                 mutations.forEach(function(mutation) {
                     if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
                         updateMermaidTheme();
-                        // 重新渲染所有Mermaid图表
-                        setTimeout(() => {
-                            document.querySelectorAll('.mermaid').forEach(element => {
-                                mermaid.init(undefined, element);
-                            });
-                        }, 100);
                     }
                 });
             });
             observer.observe(document.documentElement, { attributes: true });
             
-            // 监听内容变化，重新绑定复制按钮
+            // 监听plan_result区域的变化，重新绑定复制按钮和渲染图表
             const contentObserver = new MutationObserver(function(mutations) {
                 mutations.forEach(function(mutation) {
                     if (mutation.type === 'childList') {
                         bindCopyButtons();
+                        // 延迟渲染图表确保内容已完全加载
+                        setTimeout(() => {
+                            forceRerenderMermaidCharts();
+                        }, 1000);
                     }
                 });
             });
@@ -2343,6 +3011,12 @@ with gr.Blocks(
                 contentObserver.observe(planResult, { childList: true, subtree: true });
             }
         });
+        
+        // 添加手动重新渲染按钮功能
+        function manualRerenderCharts() {
+            forceRerenderMermaidCharts();
+            console.log('手动重新渲染Mermaid图表');
+        }
     </script>
     """)
     
@@ -2379,42 +3053,48 @@ with gr.Blocks(
             gr.HTML("""
             <div class="tips-container">
                 <div class="tip-section primary">
-                    <h4>💡 创意提示</h4>
+                    <h4>💡 输入提示</h4>
                     <div class="tip-items">
-                        <div class="tip-item">📝 描述核心功能和特性</div>
-                        <div class="tip-item">👥 说明目标用户群体</div>
-                        <div class="tip-item">⚙️ 提及技术偏好或限制</div>
-                        <div class="tip-item">🎯 描述主要使用场景</div>
+                        <div class="tip-item">描述核心功能</div>
+                        <div class="tip-item">说明目标用户</div>
+                        <div class="tip-item">技术偏好</div>
                     </div>
                 </div>
                 
                 <div class="tip-section secondary">
-                    <h4>🎯 AI增强功能</h4>
+                    <h4>🎯 输出内容</h4>
                     <div class="feature-grid">
                         <div class="feature-item">
                             <span class="feature-icon">📋</span>
-                            <span class="feature-text">完整开发计划</span>
+                            <span class="feature-text">开发计划</span>
                         </div>
                         <div class="feature-item">
                             <span class="feature-icon">🤖</span>
-                            <span class="feature-text">AI编程助手</span>
+                            <span class="feature-text">编程提示词</span>
                         </div>
                         <div class="feature-item">
-                            <span class="feature-icon">🔗</span>
-                            <span class="feature-text">智能链接解析</span>
+                            <span class="feature-icon">📊</span>
+                            <span class="feature-text">架构图表</span>
                         </div>
                         <div class="feature-item">
-                            <span class="feature-icon">🎨</span>
-                            <span class="feature-text">专业文档</span>
+                            <span class="feature-icon">📁</span>
+                            <span class="feature-text">可下载文档</span>
                         </div>
                     </div>
                 </div>
                 
                 <div class="quick-start">
-                    <div class="start-indicator">⚡ 30秒获得完整方案</div>
+                    <div class="start-indicator">⚡ 专为开发者设计</div>
                 </div>
             </div>
             """)
+    
+    # 进度条容器
+    progress_container = gr.HTML(
+        value="",
+        visible=False,
+        elem_id="progress_container"
+    )
     
     # 结果显示区域
     with gr.Column(elem_classes="result-container"):
@@ -2422,22 +3102,12 @@ with gr.Blocks(
             value="""
 <div style="text-align: center; padding: 2rem; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border-radius: 1rem; border: 2px dashed #cbd5e0;">
     <div style="font-size: 3rem; margin-bottom: 1rem;">🤖</div>
-    <h3 style="color: #2b6cb0; margin-bottom: 1rem; font-weight: bold;">AI开发计划生成器</h3>
+    <h3 style="color: #2b6cb0; margin-bottom: 1rem; font-weight: bold;">输入创意，生成方案</h3>
     <p style="color: #4a5568; font-size: 1.1rem; margin-bottom: 1.5rem;">
-        💭 <strong style="color: #e53e3e;">输入您的产品创意，AI将生成完整的开发计划和编程提示词</strong>
+        <strong style="color: #e53e3e;">包含：技术方案 • 开发计划 • 部署策略 • AI编程提示词</strong>
     </p>
-    <div style="background: linear-gradient(90deg, #edf2f7 0%, #e6fffa 100%); padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; border-left: 4px solid #38b2ac;">
-        <p style="color: #2c7a7b; margin: 0; font-weight: 600;">
-            🎯 <strong style="color: #d69e2e;">包含：</strong><span style="color: #e53e3e;">技术方案</span> • <span style="color: #38a169;">开发计划</span> • <span style="color: #3182ce;">部署策略</span> • <span style="color: #805ad5;">AI编程提示词</span>
-        </p>
-    </div>
-    <div style="background: linear-gradient(45deg, #fed7d7 0%, #fbb6ce 100%); padding: 0.8rem; border-radius: 0.5rem; margin: 1rem 0;">
-        <p style="color: #c53030; margin: 0; font-weight: 600;">
-            ⚡ <strong>特色功能：</strong>MCP服务集成 • 个性化提示词 • 专业美化界面
-        </p>
-    </div>
     <p style="color: #a0aec0; font-size: 0.9rem;">
-        点击上方 <span style="color: #e53e3e; font-weight: bold;">"🤖 AI生成开发计划 + 编程提示词"</span> 按钮开始
+        点击 <span style="color: #e53e3e; font-weight: bold;">"🚀 AI生成开发计划 + 编程提示词"</span> 开始
     </p>
 </div>
             """,
@@ -2468,6 +3138,12 @@ with gr.Blocks(
                 size="sm",
                 elem_classes="copy-btn"
             )
+            rerender_charts_btn = gr.Button(
+                "📊 重新渲染图表",
+                variant="secondary",
+                size="sm",
+                elem_classes="copy-btn"
+            )
             
         # 下载提示信息
         download_info = gr.HTML(
@@ -2479,7 +3155,7 @@ with gr.Blocks(
         # 使用提示
         gr.HTML("""
         <div style="padding: 10px; background: #e3f2fd; border-radius: 8px; text-align: center; color: #1565c0;" id="usage_tips">
-            💡 <strong style="color: #0d47a1;">使用提示</strong>: 点击上方按钮复制内容到剪贴板，或使用下方下载功能保存为文件。
+            💡 <strong>复制内容到剪贴板，或下载文件保存</strong>
         </div>
         """)
         
@@ -2522,62 +3198,41 @@ with gr.Blocks(
     # 使用说明
     gr.HTML("""
     <div class="prompts-section" id="ai_helper_instructions">
-        <h3>🤖 AI编程助手使用说明</h3>
-        <p><strong>生成的编程提示词可以直接用于：</strong></p>
-        <ul>
-            <li>🔵 <strong>Claude Code</strong> - 专业的AI编程助手</li>
-            <li>🟢 <strong>GitHub Copilot</strong> - 代码自动补全工具</li>
-            <li>🟡 <strong>ChatGPT</strong> - 通用AI助手的编程模式</li>
-            <li>🔴 <strong>其他AI编程工具</strong> - 支持提示词输入的工具</li>
-        </ul>
-        <p><em>💡 建议：复制特定的编程提示词，然后粘贴到您选择的AI编程工具中，获得针对性的代码实现。</em></p>
+        <h3>🤖 编程提示词使用说明</h3>
+        <p><strong>支持工具：</strong>Claude Code • GitHub Copilot • ChatGPT • 其他AI编程工具</p>
+        <p><em>复制特定提示词，粘贴到AI工具中获得代码实现</em></p>
     </div>
     """)
     
     # Agent应用展示部分
-    with gr.Accordion("🤖 Agent应用架构说明", open=False):
+    with gr.Accordion("🤖 技术架构", open=False):
         gr.Markdown("""
 ### 🎯 **Agent应用特色**
 
-VibeDoc 是一个展示 **Agent应用** 能力的典型案例：
+**🔄 工作流程：** 接收输入 → 智能路由 → 多服务协作 → 知识融合 → 结构化输出
 
-**🔄 Agent工作流程：**
-1. **接收用户输入** - 处理产品创意和参考链接
-2. **智能路由决策** - 根据URL类型选择合适的MCP服务
-3. **多服务协作** - 调用DeepWiki、Fetch、Doubao等MCP服务
-4. **知识融合处理** - 将外部知识与AI推理结合
-5. **结构化输出** - 生成完整的开发计划和编程助手提示词
-
-**🤖 与传统应用的区别：**
-- ❌ **传统应用**: 固定的处理逻辑，单一的数据源
-- ✅ **Agent应用**: 智能决策路由，多服务协作，自适应工作流
-
-**🌟 技术亮点：**
-- 🧠 智能服务路由算法
-- 🔗 多MCP服务无缝集成  
-- 🛡️ 完善的容错降级机制
-- 📊 知识增强的AI生成
+**🤖 技术优势：**
+- 智能决策路由，多服务协作
+- 外部知识与AI深度融合  
+- 自适应工作流，容错降级
         """)
         
         gr.Code(
-            value="""# Agent应用 vs MCP Server 的区别
+            value="""# Agent应用架构
 
-🤖 Agent应用 (我们的VibeDoc):
-├── 使用者: 调用多个MCP服务
-├── 职责: 智能决策和服务协作
-├── 特点: 自适应工作流，多源数据融合
-└── 价值: 提供完整的业务解决方案
+🤖 VibeDoc Agent (我们的应用):
+├── 调用多个MCP服务
+├── 智能决策和服务协作  
+├── 自适应工作流，多源数据融合
+└── 提供完整的业务解决方案
 
 🔧 MCP Server:
-├── 提供者: 被Agent应用调用
-├── 职责: 提供特定功能服务
-├── 特点: 标准化接口，专业化能力
-└── 价值: 为Agent提供可复用的组件
-
-💡 VibeDoc展示了Agent如何智能地协调多个MCP服务，
-   实现比单个服务更强大的综合能力！""",
+├── 被Agent调用的服务
+├── 提供特定功能（如DeepWiki、Fetch、Doubao）
+├── 标准化接口，专业化能力
+└── 为Agent提供可复用组件""",
             language="yaml",
-            label="Agent应用架构说明"
+            label="架构说明"
         )
     
     # 绑定事件
@@ -2585,23 +3240,23 @@ VibeDoc 是一个展示 **Agent应用** 能力的典型案例：
         return gr.update(
             value="""
             <div style="padding: 10px; background: #e8f5e8; border-radius: 8px; text-align: center; margin: 10px 0; color: #2d5a2d;" id="download_success_info">
-                ✅ <strong style="color: #1a5a1a;">文档已生成！</strong> 您现在可以：
-                <br>• 📋 <span style="color: #2d5a2d;">复制开发计划或编程提示词</span>
-                <br>• 📁 <span style="color: #2d5a2d;">点击下方下载按钮保存文档</span>
-                <br>• 🔄 <span style="color: #2d5a2d;">调整创意重新生成</span>
+                ✅ <strong style="color: #1a5a1a;">文档已生成！</strong> 
+                📋 复制内容 • 📁 下载文档 • 🔄 重新生成
             </div>
             """,
             visible=True
         )
     
     generate_btn.click(
-        fn=generate_development_plan,
+        fn=generate_development_plan_gradio,
         inputs=[idea_input, reference_url_input],
-        outputs=[plan_output, prompts_for_copy, download_file],
-        api_name="generate_plan"
+        outputs=[plan_output, prompts_for_copy, download_file, progress_container],
+        api_name="generate_plan",
+        js="(idea, url) => { showProgressBeforeGeneration(); return [idea, url]; }"
     ).then(
         fn=lambda: gr.update(visible=True),
-        outputs=[download_file]
+        outputs=[download_file],
+        js="() => { hideProgress(); }"
     ).then(
         fn=show_download_info,
         outputs=[download_info]
@@ -2663,6 +3318,17 @@ VibeDoc 是一个展示 **Agent应用** 能力的典型案例：
                 }
                 document.body.removeChild(textArea);
             }
+        }"""
+    )
+    
+    # 图表重新渲染按钮
+    rerender_charts_btn.click(
+        fn=None,
+        inputs=[],
+        outputs=[],
+        js="""() => {
+            manualRerenderCharts();
+            alert('🔄 正在重新渲染Mermaid图表...');
         }"""
     )
 
