@@ -33,19 +33,8 @@ if config_errors:
     for key, error in config_errors.items():
         logger.warning(f"⚠️ 配置警告 {key}: {error}")
 
-# 初始化Doubao MCP服务（如果启用）
-doubao_service = config.get_mcp_service("doubao")
-if doubao_service and doubao_service.enabled:
-    logger.info("🎨 初始化Doubao MCP服务...")
-    try:
-        requests.post(
-            doubao_service.url,
-            json={"action": "set_api_key", "params": {"api_key": doubao_service.api_key}},
-            timeout=10
-        )
-        logger.info("✅ Doubao API Key设置成功")
-    except Exception as e:
-        logger.error(f"❌ Doubao API Key设置失败: {e}")
+# Doubao图像生成服务已移除以提升性能和专注核心功能
+# 保留Mermaid图表生成能力，专注于文档和代码生成
 
 def validate_input(user_idea: str) -> Tuple[bool, str]:
     """验证用户输入"""
@@ -580,13 +569,13 @@ src/
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                "max_tokens": 8000,  # 增加到8000确保图表和提示词完整性
-                "temperature": 0.5,  # 降低到0.5提高一致性和速度
-                "top_p": 0.85,       # 优化top_p平衡质量和速度
-                "frequency_penalty": 0.2,  # 增加到0.2减少重复
-                "presence_penalty": 0.1    # 添加存在惩罚提高多样性
+                "max_tokens": 8000,  # 确保完整输出
+                "temperature": 0.5,  # 优化一致性和速度
+                "top_p": 0.85,       # 平衡质量和速度
+                "frequency_penalty": 0.2,  # 减少重复内容
+                "presence_penalty": 0.1    # 提高内容多样性
             },
-            timeout=75  # 进一步减少到75秒
+            timeout=75  # 优化响应时间
         )
         
         if response.status_code == 200:
@@ -729,15 +718,53 @@ def generate_with_progress_ui(user_idea: str, reference_url: str = ""):
 
 def generate_development_plan_gradio(user_idea: str, reference_url: str = ""):
     """
-    Gradio兼容的生成函数
+    Gradio兼容的生成函数 - 增强错误处理
     """
     try:
-        # 直接调用原始函数
+        # 优先检查API配置
+        if not API_KEY:
+            error_msg = """
+## ❌ 配置错误：未设置API密钥
+
+### 🔧 解决方法：
+
+1. **获取API密钥**：
+   - 访问 [Silicon Flow](https://siliconflow.cn) 
+   - 注册账户并获取API密钥
+
+2. **魔塔平台配置**：
+   - 在创空间设置中添加环境变量
+   - 变量名：`SILICONFLOW_API_KEY`
+   - 变量值：你的实际API密钥
+
+### 📋 配置完成后重启应用即可使用完整功能！
+
+---
+
+**💡 提示**：API密钥是必填项，没有它就无法调用AI服务生成开发计划。
+"""
+            return error_msg, "", "", ""
+        
+        # 调用核心生成函数
         plan_content, prompts_content, temp_file = generate_development_plan_with_progress(user_idea, reference_url, None)
         # 返回结果时，进度容器应该为空（由JavaScript隐藏）
         return plan_content, prompts_content, temp_file, ""
+        
     except Exception as e:
-        error_msg = f"❌ 生成过程中出现错误: {str(e)}"
+        logger.error(f"Generation error: {str(e)}")
+        error_msg = f"""
+## ❌ 生成过程中出现错误
+
+**错误信息**: {str(e)}
+
+### 🔧 可能的解决方法：
+1. **检查网络连接**：确保网络正常
+2. **检查API配置**：确认API密钥正确
+3. **重试操作**：稍后再试
+4. **联系支持**：如问题持续，请联系技术支持
+
+---
+"""
         return error_msg, "", "", ""
 
 def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[str, str, str]:
