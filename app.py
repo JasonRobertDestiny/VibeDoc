@@ -380,7 +380,7 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
     # 获取外部知识库内容
     retrieved_knowledge = fetch_external_knowledge(reference_url)
     
-    # 构建系统提示词 - 防止虚假链接生成
+    # 构建系统提示词 - 防止虚假链接生成，强化编程提示词生成
     system_prompt = """你是一个资深技术项目经理，精通产品规划和 AI 编程助手（如 GitHub Copilot、ChatGPT Code）提示词撰写。
 
 🔴 重要要求：
@@ -400,15 +400,43 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
 - 只引用用户实际提供的参考链接
 - 当外部知识不可用时，明确说明是基于最佳实践生成
 
-🎯 编程提示词格式要求：
-- 编程提示词部分必须是纯文本的prompt，不要包含代码示例
-- 每个提示词要详细描述需求、约束条件和期望输出
-- 格式为：描述 + 具体要求列表 + 输出格式说明
-- 提示词要能直接复制粘贴到AI编程工具中使用
+🎯 AI编程提示词格式要求（重要）：
+- 必须在开发计划后生成专门的"# AI编程助手提示词"部分
+- 每个功能模块必须有一个专门的AI编程提示词
+- 每个提示词必须使用```代码块格式，方便复制
+- 提示词内容要基于具体项目功能，不要使用通用模板
+- 提示词要详细、具体、可直接用于AI编程工具
+- 必须包含完整的上下文和具体要求
 
-请输出结构化的内容，包含：
-- 完整的开发计划（Markdown格式，必须融合外部参考）
-- 对应的AI编程助手提示词列表（纯prompt格式，不含代码）
+🔧 提示词结构要求：
+每个提示词使用以下格式：
+
+## [功能名称]开发提示词
+
+```
+请为[具体项目名称]开发[具体功能描述]。
+
+项目背景：
+[基于开发计划的项目背景]
+
+功能要求：
+1. [具体要求1]
+2. [具体要求2]
+...
+
+技术约束：
+- 使用[具体技术栈]
+- 遵循[具体规范]
+- 实现[具体性能要求]
+
+输出要求：
+- 完整可运行代码
+- 详细注释说明
+- 错误处理机制
+- 测试用例
+```
+
+请严格按照此格式生成个性化的编程提示词，确保每个提示词都基于具体项目需求。
 
 格式要求：先输出开发计划，然后输出编程提示词部分。"""
 
@@ -416,7 +444,7 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
     user_prompt = f"""产品创意：{user_idea}"""
     
     # 如果成功获取到外部知识，则注入到提示词中
-    if retrieved_knowledge and not retrieved_knowledge.startswith("❌"):
+    if retrieved_knowledge and not any(keyword in retrieved_knowledge for keyword in ["❌", "⚠️", "处理说明", "暂时不可用"]):
         user_prompt += f"""
 
 # 外部知识库参考
@@ -511,13 +539,49 @@ def create_temp_markdown_file(content: str) -> str:
         return ""
 
 def format_response(content: str) -> str:
-    """格式化AI回复，确保包含编程提示词部分并优化视觉呈现"""
+    """格式化AI回复，美化显示并保持原始AI生成的提示词"""
     
     # 添加时间戳和格式化标题
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # 增强视觉呈现的格式化内容
-    formatted_content = f"""
+    # 分割开发计划和AI编程提示词
+    parts = content.split('# AI编程助手提示词')
+    
+    if len(parts) >= 2:
+        # 有明确的AI编程提示词部分
+        plan_content = parts[0].strip()
+        prompts_content = '# AI编程助手提示词' + parts[1]
+        
+        # 美化AI编程提示词部分
+        enhanced_prompts = enhance_prompts_display(prompts_content)
+        
+        formatted_content = f"""
+<div class="plan-header">
+
+# 🚀 AI生成的开发计划
+
+<div class="meta-info">
+
+**⏰ 生成时间：** {timestamp}  
+**🤖 AI模型：** Qwen2.5-72B-Instruct  
+**💡 基于用户创意智能分析生成**  
+**🔗 Agent应用MCP服务增强**
+
+</div>
+
+</div>
+
+---
+
+{enhance_markdown_structure(plan_content)}
+
+---
+
+{enhanced_prompts}
+"""
+    else:
+        # 没有明确分割，使用原始内容
+        formatted_content = f"""
 <div class="plan-header">
 
 # 🚀 AI生成的开发计划
@@ -538,136 +602,115 @@ def format_response(content: str) -> str:
 {enhance_markdown_structure(content)}
 """
     
-    # 如果内容中包含代码示例而不是纯prompt，需要转换格式
-    if "```python" in content or "```jsx" in content or "```javascript" in content:
-        formatted_content += """
-
----
-
-<div class="section-divider"></div>
-
-# 🤖 优化后的AI编程助手提示词
-
-<div class="prompts-highlight">
-
-> 💡 **使用说明**：以下提示词可以直接复制到 Claude Code、GitHub Copilot、ChatGPT 等AI编程工具中使用
-
-⚠️ **注意**：原始输出包含了代码示例，以下是转换为标准prompt格式的版本：
-
-## 🔧 核心功能开发提示词
-
-```
-请基于上述开发计划，为主要功能模块创建完整的实现代码。
-
-具体要求：
-1. 使用开发计划中推荐的技术栈
-2. 每个函数都要包含完整的类型注解和文档字符串  
-3. 实现完善的错误处理和异常捕获
-4. 添加单元测试和集成测试
-5. 遵循PEP8代码规范和最佳实践
-6. 包含详细的代码注释说明业务逻辑
-
-输出格式：
-- 完整的可运行代码
-- 必要的依赖安装说明
-- 使用示例和测试用例
-```
-
-## 🗄️ 数据库设计提示词
-
-```
-请根据开发计划中的产品需求，设计完整的数据库架构。
-
-设计要求：
-1. 创建详细的实体关系图(ERD)
-2. 编写完整的表结构定义SQL(DDL)
-3. 设计合理的索引策略提升查询性能
-4. 创建数据初始化和迁移脚本
-5. 制定数据备份和恢复方案
-6. 考虑数据安全和权限控制
-
-输出内容：
-- ERD图的文字描述
-- 完整的建表SQL语句
-- 索引创建语句
-- 示例数据插入语句
-- 数据库优化建议
-```
-
-## 🌐 API接口开发提示词
-
-```
-请为项目设计和实现完整的RESTful API接口系统。
-
-开发要求：
-1. 设计符合REST规范的API接口
-2. 使用OpenAPI/Swagger规范编写API文档
-3. 实现标准的HTTP状态码和错误处理
-4. 添加请求参数验证和响应格式统一
-5. 实现JWT认证和权限控制
-6. 编写完整的接口测试用例
-
-交付物：
-- API接口的完整实现代码
-- OpenAPI文档(YAML格式)
-- 接口测试用例
-- 部署和使用说明
-- 性能优化建议
-```
-
-## 🎨 前端界面开发提示词
-
-```
-请基于开发计划创建现代化的前端用户界面。
-
-设计要求：
-1. 实现响应式设计，适配桌面和移动设备
-2. 使用现代化UI组件库(如Material-UI、Ant Design)
-3. 实现流畅的用户交互和动画效果
-4. 支持国际化(i18n)和主题切换
-5. 优化页面加载性能和用户体验
-6. 确保可访问性(a11y)标准
-
-输出内容：
-- 完整的组件代码
-- 样式文件(CSS/SCSS)
-- 状态管理实现
-- 路由配置
-- 性能优化方案
-- 测试用例
-```
-
-## 🧪 测试开发提示词
-
-```
-请为项目创建完整的测试体系。
-
-测试要求：
-1. 编写单元测试覆盖核心业务逻辑
-2. 实现集成测试验证模块间协作
-3. 创建端到端(E2E)测试模拟用户操作
-4. 设置自动化测试流程和CI/CD集成
-5. 实现性能测试和压力测试
-6. 添加代码覆盖率检查
-
-交付内容：
-- 完整的测试代码
-- 测试配置文件
-- 测试数据和Mock设置
-- 自动化测试脚本
-- 测试报告模板
-- 测试最佳实践文档
-```
-
-</div>
-
----
-
-**💡 使用提示：** 复制任一提示词到AI编程工具中，它们会根据具体需求生成对应的代码实现！
-"""
-    
     return formatted_content
 
+def enhance_prompts_display(prompts_content: str) -> str:
+    """美化AI编程提示词显示"""
+    lines = prompts_content.split('\n')
+    enhanced_lines = []
+    in_code_block = False
+    
+    for line in lines:
+        stripped = line.strip()
+        
+        # 处理标题
+        if stripped.startswith('# AI编程助手提示词'):
+            enhanced_lines.append('')
+            enhanced_lines.append('<div class="prompts-highlight">')
+            enhanced_lines.append('')
+            enhanced_lines.append('# 🤖 AI编程助手提示词')
+            enhanced_lines.append('')
+            enhanced_lines.append('> 💡 **使用说明**：以下提示词基于您的项目需求定制生成，可直接复制到 Claude Code、GitHub Copilot、ChatGPT 等AI编程工具中使用')
+            enhanced_lines.append('')
+            continue
+            
+        # 处理二级标题（功能模块）
+        if stripped.startswith('## ') and not in_code_block:
+            title = stripped[3:].strip()
+            enhanced_lines.append('')
+            enhanced_lines.append('<div class="prompt-section">')
+            enhanced_lines.append('')
+            enhanced_lines.append(f'## 🎯 {title}')
+            enhanced_lines.append('')
+            continue
+            
+        # 处理代码块开始
+        if stripped.startswith('```') and not in_code_block:
+            in_code_block = True
+            enhanced_lines.append('')
+            enhanced_lines.append('<div class="prompt-code-block">')
+            enhanced_lines.append('')
+            enhanced_lines.append('```prompt')
+            continue
+            
+        # 处理代码块结束
+        if stripped.startswith('```') and in_code_block:
+            in_code_block = False
+            enhanced_lines.append('```')
+            enhanced_lines.append('')
+            enhanced_lines.append('</div>')
+            enhanced_lines.append('')
+            enhanced_lines.append('</div>')
+            enhanced_lines.append('')
+            continue
+            
+        # 其他内容保持原样
+        enhanced_lines.append(line)
+    
+    # 如果还在代码块中，需要关闭
+    if in_code_block:
+        enhanced_lines.extend(['```', '', '</div>', '', '</div>'])
+    
+    # 关闭主容器
+    enhanced_lines.extend(['', '</div>', ''])
+    
+    return '\n'.join(enhanced_lines)
+
+def extract_prompts_section(content: str) -> str:
+    """从完整内容中提取AI编程提示词部分"""
+    # 分割内容，查找AI编程提示词部分
+    parts = content.split('# AI编程助手提示词')
+    
+    if len(parts) >= 2:
+        prompts_content = '# AI编程助手提示词' + parts[1]
+        # 清理和格式化提示词内容，移除HTML标签以便复制
+        clean_prompts = clean_prompts_for_copy(prompts_content)
+        return clean_prompts
+    else:
+        # 如果没有找到明确的提示词部分，尝试其他关键词
+        lines = content.split('\n')
+        prompts_section = []
+        in_prompts_section = False
+        
+        for line in lines:
+            if any(keyword in line for keyword in ['编程提示词', '编程助手', 'Prompt', 'AI助手']):
+                in_prompts_section = True
+            if in_prompts_section:
+                prompts_section.append(line)
+        
+        return '\n'.join(prompts_section) if prompts_section else "未找到编程提示词部分"
+
+def clean_prompts_for_copy(prompts_content: str) -> str:
+    """清理提示词内容，移除HTML标签，优化复制体验"""
+    import re
+    
+    # 移除HTML标签
+    clean_content = re.sub(r'<[^>]+>', '', prompts_content)
+    
+    # 清理多余的空行
+    lines = clean_content.split('\n')
+    cleaned_lines = []
+    
+    for line in lines:
+        stripped = line.strip()
+        if stripped:
+            cleaned_lines.append(line)
+        elif cleaned_lines and cleaned_lines[-1].strip():  # 避免连续空行
+            cleaned_lines.append('')
+    
+    return '\n'.join(cleaned_lines)
+
+# 删除多余的旧代码，这里应该是enhance_markdown_structure函数
 def enhance_markdown_structure(content: str) -> str:
     """增强Markdown结构，添加视觉亮点和层级"""
     lines = content.split('\n')
@@ -1034,6 +1077,131 @@ custom_css = """
     background: linear-gradient(90deg, transparent 0%, #4299e1 20%, #68d391 80%, transparent 100%);
     height: 1px;
     margin: 2rem 0;
+}
+
+/* 编程提示词专用样式 */
+.prompts-highlight {
+    background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
+    border: 2px solid #4299e1;
+    border-radius: 1rem;
+    padding: 2rem;
+    margin: 2rem 0;
+    position: relative;
+    box-shadow: 0 8px 25px rgba(66, 153, 225, 0.15);
+}
+
+.prompts-highlight:before {
+    content: "🤖";
+    position: absolute;
+    top: -0.8rem;
+    left: 1.5rem;
+    background: linear-gradient(135deg, #4299e1, #667eea);
+    color: white;
+    padding: 0.8rem;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    box-shadow: 0 4px 12px rgba(66, 153, 225, 0.3);
+}
+
+.prompt-section {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 0.8rem;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    border-left: 4px solid #667eea;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+}
+
+.prompt-code-block {
+    position: relative;
+    margin: 1rem 0;
+}
+
+.prompt-code-block pre {
+    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%) !important;
+    border: 2px solid #4299e1;
+    border-radius: 0.8rem;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow-x: auto;
+}
+
+.prompt-code-block pre:before {
+    content: "📋 点击复制此提示词";
+    position: absolute;
+    top: -0.5rem;
+    right: 1rem;
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    color: white;
+    padding: 0.3rem 0.8rem;
+    border-radius: 1rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.prompt-code-block code {
+    color: #e2e8f0 !important;
+    font-family: 'Fira Code', 'Monaco', 'Consolas', monospace !important;
+    font-size: 0.95rem !important;
+    line-height: 1.6 !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+/* 提示词高亮关键词 */
+.prompt-code-block code .keyword {
+    color: #81e6d9 !important;
+    font-weight: 600;
+}
+
+.prompt-code-block code .requirement {
+    color: #fbb6ce !important;
+}
+
+.prompt-code-block code .output {
+    color: #c6f6d5 !important;
+}
+
+/* 复制按钮增强 */
+.copy-btn {
+    background: linear-gradient(45deg, #667eea, #764ba2) !important;
+    border: none !important;
+    color: white !important;
+    padding: 0.8rem 1.5rem !important;
+    border-radius: 2rem !important;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3) !important;
+}
+
+.copy-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4) !important;
+    background: linear-gradient(45deg, #5a67d8, #667eea) !important;
+}
+
+.copy-btn:active {
+    transform: translateY(0) !important;
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+    .prompts-highlight {
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .prompt-section {
+        padding: 1rem;
+    }
+    
+    .prompt-code-block pre {
+        padding: 1rem;
+        font-size: 0.85rem;
+    }
 }
 
 /* Fix accordion height issue - Agent应用架构说明折叠问题 */
