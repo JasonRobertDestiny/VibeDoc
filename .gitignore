@@ -62,3 +62,5 @@ coverage.xml
 # 系统文件
 Thumbs.db
 Desktop.ini
+
+.config/

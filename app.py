@@ -4,8 +4,11 @@ import os
 import logging
 import json
 import tempfile
+import time
+import random
+import re
 from datetime import datetime
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, Generator
 from urllib.parse import urlparse
 
 # 导入模块化组件
@@ -64,6 +67,113 @@ def validate_url(url: str) -> bool:
         return all([result.scheme, result.netloc])
     except Exception:
         return False
+
+def get_compact_mcp_status() -> str:
+    """获取紧凑版MCP服务状态显示"""
+    try:
+        status_summary = mcp_manager.get_status_summary()
+        
+        # 简化状态显示
+        compact_html = '''
+        <div class="mcp-status-compact">
+            <h4 style="color: #3182ce; margin-bottom: 8px; font-size: 14px;">🔗 MCP服务状态</h4>
+            <div class="service-status-grid">
+        '''
+        
+        for service_name, service_config in config.mcp_services.items():
+            if service_config.enabled:
+                status_color = "#38a169" if service_config.url else "#e53e3e"
+                status_icon = "✅" if service_config.url else "❌"
+                compact_html += f'''
+                <div class="service-item">
+                    <span class="status-icon">{status_icon}</span>
+                    <span class="service-name" style="color: {status_color};">{service_name.title()}</span>
+                </div>
+                '''
+        
+        compact_html += '''
+            </div>
+            <div style="font-size: 12px; color: #718096; margin-top: 8px;">
+                💡 外部知识增强AI生成质量
+            </div>
+        </div>
+        '''
+        
+        return compact_html
+        
+    except Exception as e:
+        logger.error(f"Error getting compact MCP status: {e}")
+        return '''
+        <div class="mcp-status-compact">
+            <h4 style="color: #e53e3e;">🔗 MCP服务</h4>
+            <p style="font-size: 12px; color: #718096;">状态获取中...</p>
+        </div>
+        '''
+
+def stream_generation_with_progress(user_idea: str, reference_url: str):
+    """处理流式生成并更新进度"""
+    
+    # 预估时间并显示
+    estimated_time = estimate_generation_time(user_idea, reference_url)
+    
+    # 初始状态：显示进度容器并开始
+    yield (
+        gr.Row.update(visible=True),  # 显示进度容器
+        f'<div class="progress-wrapper"><div class="progress-bar" style="width: 0%"></div></div>',
+        "🚀 准备开始生成...",
+        f'<div class="time-estimate">⏱️ 预计用时: {estimated_time}秒</div>',
+        gr.Markdown.update(value=""),
+        ""
+    )
+    
+    final_plan = ""
+    final_assistant = ""
+    
+    for status, plan, assistant in generate_development_plan_streaming(user_idea, reference_url):
+        # 解析进度
+        progress = 0
+        if "进度:" in status:
+            progress_match = re.search(r'进度: (\d+)%', status)
+            if progress_match:
+                progress = int(progress_match.group(1))
+        
+        # 更新进度条HTML
+        progress_html = f'<div class="progress-wrapper"><div class="progress-bar" style="width: {progress}%"></div></div>'
+        
+        # 显示预估时间（仅在开始时）
+        time_html = ""
+        if progress < 20:
+            time_html = f'<div class="time-estimate">⏱️ 预计用时: {estimated_time}秒</div>'
+        elif progress >= 100:
+            time_html = '<div class="time-estimate">✅ 生成完成！</div>'
+        
+        # 保存最终结果
+        if plan and plan.strip():
+            final_plan = plan
+        if assistant and assistant.strip():
+            final_assistant = assistant
+        
+        yield (
+            gr.Row.update(visible=True),  # 保持进度容器可见
+            progress_html,  # 更新进度条
+            status,  # 更新状态文本
+            time_html,  # 更新预估时间
+            gr.Markdown.update(value=final_plan) if final_plan else gr.Markdown.update(),  # 更新计划
+            final_assistant  # 更新编程助手
+        )
+    
+    # 生成完成后，稍作停顿然后隐藏进度显示
+    import time
+    time.sleep(1)
+    
+    yield (
+        gr.Row.update(visible=False),  # 隐藏进度容器
+        "",  # 清空进度条
+        "",  # 清空状态
+        "",  # 清空时间
+        gr.Markdown.update(value=final_plan) if final_plan else gr.Markdown.update(),  # 保持最终计划
+        final_assistant  # 保持最终编程助手
+    )
 
 def get_mcp_status_display() -> str:
     """获取MCP服务状态显示 - 使用模块化管理器"""
@@ -586,6 +696,285 @@ gantt
         logger.error(f"Unexpected error: {str(e)}")
         return f"❌ 处理错误: {str(e)}", "", ""
 
+def estimate_generation_time(user_idea: str, reference_url: str) -> int:
+    """基于输入复杂度预估生成时间"""
+    base_time = 30  # 基础时间30秒
+    
+    # 根据创意长度调整
+    if len(user_idea) > 200:
+        base_time += 20
+    elif len(user_idea) > 100:
+        base_time += 10
+    
+    # 根据是否有参考链接调整
+    if reference_url and reference_url.strip():
+        base_time += 30  # MCP服务调用需要额外时间
+    
+    # 根据MCP服务可用性调整
+    available_services = sum(1 for service in config.mcp_services.values() if service.enabled)
+    if available_services == 0:
+        base_time -= 10  # 不调用MCP服务，时间减少
+    
+    return min(base_time, 120)  # 最大不超过2分钟
+
+def get_random_tip() -> str:
+    """返回随机的开发小贴士"""
+    tips = [
+        "💡 好的产品名称应该简单易记，最好不超过3个字",
+        "🎯 MVP版本通常只需要核心功能的20%就能验证想法",
+        "🚀 选择熟悉的技术栈比追求最新技术更重要",
+        "📊 用户反馈比个人喜好更重要",
+        "🔄 敏捷开发：小步快跑，快速迭代",
+        "🛡️ 安全第一：从设计阶段就要考虑安全问题",
+        "⚡ 性能优化：80%的性能问题来自20%的代码",
+        "📱 移动优先：超过60%的用户使用移动设备",
+        "🧪 测试驱动：先写测试，再写代码",
+        "📝 文档重要：好的文档是团队协作的基础"
+    ]
+    return random.choice(tips)
+
+def generate_development_plan_streaming(user_idea: str, reference_url: str = "") -> Generator[Tuple[str, str, str], None, None]:
+    """
+    流式生成开发计划，提供实时进度反馈
+    
+    Args:
+        user_idea (str): 用户的产品创意描述
+        reference_url (str): 可选的参考链接
+        
+    Yields:
+        Tuple[str, str, str]: (状态信息, 开发计划, AI编程助手提示词)
+    """
+    # 预估总时间
+    estimated_time = estimate_generation_time(user_idea, reference_url)
+    
+    # 定义生成步骤
+    steps = [
+        ("🔍 正在分析您的创意...", 8, 2),
+        ("🌐 获取外部知识库内容...", 15, 3), 
+        ("🧠 AI正在构建产品规划...", 25, 4),
+        ("🛠️ 生成技术架构方案...", 20, 3),
+        ("🚀 制定部署运维策略...", 15, 2),
+        ("📈 规划营销推广方案...", 10, 2),
+        ("🤖 生成AI编程助手...", 7, 2)
+    ]
+    
+    total_progress = 0
+    
+    try:
+        # 步骤1: 验证输入
+        yield f"进度: {total_progress}% - 🔍 正在分析您的创意...", "", ""
+        time.sleep(1)
+        
+        is_valid, error_msg = validate_input(user_idea)
+        if not is_valid:
+            yield f"❌ 输入验证失败: {error_msg}", "", ""
+            return
+        
+        if not API_KEY:
+            yield "❌ 配置错误：未设置API密钥", "", ""
+            return
+        
+        total_progress += steps[0][1]
+        tip = get_random_tip()
+        yield f"进度: {total_progress}% - ✅ 创意分析完成！\n💡 小贴士：{tip}", "", ""
+        time.sleep(1)
+        
+        # 步骤2: 获取外部知识
+        yield f"进度: {total_progress}% - 🌐 获取外部知识库内容...", "", ""
+        
+        if reference_url and reference_url.strip():
+            yield f"进度: {total_progress + 5}% - 🔗 正在连接MCP服务...", "", ""
+            retrieved_knowledge = fetch_external_knowledge(reference_url)
+            yield f"进度: {total_progress + 10}% - 📚 外部知识获取完成", "", ""
+        else:
+            retrieved_knowledge = ""
+            yield f"进度: {total_progress + 10}% - 📝 使用内置知识库", "", ""
+        
+        total_progress += steps[1][1]
+        time.sleep(1)
+        
+        # 步骤3-4: 构建提示词
+        yield f"进度: {total_progress}% - 🧠 AI正在构建产品规划...", "", ""
+        time.sleep(2)
+        
+        # 这里包含原来的system_prompt和user_prompt构建逻辑
+        system_prompt = """你是一个资深技术项目经理，精通产品规划和 AI 编程助手（如 GitHub Copilot、ChatGPT Code）提示词撰写。
+
+🔴 重要要求：
+1. 当收到外部知识库参考时，你必须在开发计划中明确引用和融合这些信息
+2. 必须在开发计划的开头部分提及参考来源（如CSDN博客、GitHub项目等）
+3. 必须根据外部参考调整技术选型和实施建议
+4. 必须在相关章节中使用"参考XXX建议"等表述
+5. 开发阶段必须有明确编号（第1阶段、第2阶段等）
+
+🚫 严禁行为：
+- 绝对不要编造虚假的链接或参考资料
+- 不要生成不存在的URL（如 xxx.com、example.com等）
+- 不要创建虚假的GitHub仓库链接
+- 不要引用不存在的CSDN博客文章
+
+✅ 正确做法：
+- 如果没有提供外部参考，直接基于创意进行分析
+- 只引用用户实际提供的参考链接
+- 当外部知识不可用时，明确说明是基于最佳实践生成
+
+📊 视觉化内容要求（新增）：
+- 必须在技术方案中包含架构图的Mermaid代码
+- 必须在开发计划中包含甘特图的Mermaid代码
+- 必须在功能模块中包含流程图的Mermaid代码
+- 必须包含技术栈对比表格
+- 必须包含项目里程碑时间表
+
+🎯 Mermaid图表格式要求：
+```mermaid
+graph TD
+    A[开始] --> B[需求分析]
+    B --> C[技术选型]
+    C --> D[系统设计]
+    D --> E[开发实施]
+    E --> F[测试部署]
+    F --> G[上线运营]
+```
+
+🎯 甘特图格式要求：
+```mermaid
+gantt
+    title 项目开发甘特图
+    dateFormat YYYY-MM-DD
+    section 需求分析
+    需求分析     :a1, 2024-01-01, 7d
+    section 系统设计
+    系统设计     :a2, after a1, 14d
+    section 开发实施
+    开发实施     :a3, after a2, 28d
+    section 测试部署
+    测试部署     :a4, after a3, 14d
+```
+
+🎯 必须严格按照Mermaid语法规范生成图表，不能有格式错误
+
+🎯 AI编程提示词格式要求（重要）：
+- 必须在开发计划后生成专门的"# AI编程助手提示词"部分
+- 每个功能模块必须有一个专门的AI编程提示词
+- 每个提示词必须使用```代码块格式，方便复制
+- 提示词内容要基于具体项目功能，不要使用通用模板
+- 提示词要详细、具体、可直接用于AI编程工具
+- 必须包含完整的上下文和具体要求
+
+🔧 提示词结构要求：
+每个提示词使用以下格式：
+
+## [功能名称]开发提示词
+
+```
+请为[具体项目名称]开发[具体功能描述]。
+
+项目背景：
+[基于开发计划的项目背景]
+
+功能要求：
+1. [具体要求1]
+2. [具体要求2]
+...
+
+技术约束：
+- 使用[具体技术栈]
+- 遵循[具体规范]
+- 实现[具体性能要求]
+
+输出要求：
+- 完整可运行代码
+- 详细注释说明
+- 错误处理机制
+- 测试用例
+```
+
+请严格按照此格式生成个性化的编程提示词，确保每个提示词都基于具体项目需求。
+
+格式要求：先输出开发计划，然后输出编程提示词部分。"""
+
+        user_prompt = f"""产品创意：{user_idea}"""
+        
+        if retrieved_knowledge and not any(keyword in retrieved_knowledge for keyword in ["❌", "⚠️", "处理说明", "暂时不可用"]):
+            user_prompt += f"""
+
+# 外部知识库参考
+{retrieved_knowledge}
+
+请基于上述外部知识库参考和产品创意生成："""
+        else:
+            user_prompt += """
+
+请生成："""
+        
+        user_prompt += """
+1. 详细的开发计划（包含产品概述、技术方案、开发计划、部署方案、推广策略等）
+2. 每个功能模块对应的AI编程助手提示词
+
+确保提示词具体、可操作，能直接用于AI编程工具。"""
+
+        total_progress += steps[2][1]
+        yield f"进度: {total_progress}% - 🛠️ 生成技术架构方案...", "", ""
+        time.sleep(2)
+        
+        # 步骤5: 调用API
+        yield f"进度: {total_progress}% - 🤖 AI正在思考最佳方案...", "", ""
+        
+        logger.info("Calling AI API for development plan generation...")
+        
+        response = requests.post(
+            API_URL,
+            headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
+            json={
+                "model": "Qwen/Qwen2.5-72B-Instruct",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "max_tokens": 4000,
+                "temperature": 0.7
+            },
+            timeout=120
+        )
+        
+        total_progress += steps[3][1]
+        yield f"进度: {total_progress}% - 🚀 制定部署运维策略...", "", ""
+        time.sleep(1)
+        
+        if response.status_code == 200:
+            content = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+            if content:
+                total_progress += steps[4][1]
+                yield f"进度: {total_progress}% - 📈 规划营销推广方案...", "", ""
+                time.sleep(1)
+                
+                # 后处理：确保内容结构化
+                final_plan_text = format_response(content)
+                
+                total_progress += steps[5][1]
+                yield f"进度: {total_progress}% - 🤖 生成AI编程助手...", "", ""
+                time.sleep(1)
+                
+                # 生成概念LOGO图像
+                logo_content = generate_concept_logo(user_idea)
+                if logo_content:
+                    final_plan_text += logo_content
+                
+                total_progress = 100
+                yield f"进度: {total_progress}% - 🎉 开发计划生成完成！", final_plan_text, extract_prompts_section(final_plan_text)
+            else:
+                yield "❌ API返回空内容", "", ""
+        else:
+            yield f"❌ API请求失败: HTTP {response.status_code}", "", ""
+            
+    except requests.exceptions.Timeout:
+        yield "❌ API请求超时，请稍后重试", "", ""
+    except requests.exceptions.ConnectionError:
+        yield "❌ 网络连接失败，请检查网络设置", "", ""
+    except Exception as e:
+        logger.error(f"Streaming generation error: {str(e)}")
+        yield f"❌ 处理错误: {str(e)}", "", ""
+
 def extract_prompts_section(content: str) -> str:
     """从完整内容中提取AI编程提示词部分"""
     lines = content.split('\n')
@@ -904,6 +1293,146 @@ custom_css = """
 .dark .content-card {
     background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
     border-color: #374151;
+}
+
+/* 进度条样式 */
+.progress-wrapper {
+    background: linear-gradient(90deg, #e2e8f0 0%, #cbd5e0 100%);
+    border-radius: 8px;
+    height: 12px;
+    margin: 10px 0;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%);
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.5s ease-in-out;
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-bar::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: progressShine 2s infinite;
+}
+
+@keyframes progressShine {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+.time-estimate {
+    font-size: 12px;
+    color: #6b7280;
+    text-align: center;
+    margin-top: 5px;
+    font-weight: 500;
+}
+
+#status_display {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #bae6fd;
+    border-radius: 8px;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+}
+
+/* 紧凑侧边栏样式 */
+.sidebar-compact {
+    padding: 1rem;
+}
+
+.tips-box-compact {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08);
+}
+
+.feature-tag {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    color: #1e40af;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid #93c5fd;
+}
+
+.mcp-status-compact {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #bbf7d0;
+    margin-top: 16px;
+    font-size: 12px;
+}
+
+.service-status-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+    margin: 8px 0;
+}
+
+.service-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+}
+
+.status-icon {
+    font-size: 12px;
+}
+
+.service-name {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* 状态文本动画 */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.status-text {
+    animation: pulse 2s infinite;
+    font-weight: 500;
+    color: #3b82f6;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .sidebar-compact {
+        padding: 0.5rem;
+    }
+    
+    .tips-box-compact {
+        padding: 12px;
+        font-size: 12px;
+    }
+    
+    .feature-tag {
+        font-size: 10px;
+        padding: 1px 6px;
+    }
+    
+    .progress-wrapper {
+        height: 8px;
+    }
 }
 
 .result-container {
@@ -2038,7 +2567,7 @@ with gr.Blocks(
     """)
     
     with gr.Row():
-        with gr.Column(scale=2, elem_classes="content-card"):
+        with gr.Column(scale=3, elem_classes="content-card"):
             gr.Markdown("## 💡 输入您的产品创意", elem_id="input_idea_title")
             
             idea_input = gr.Textbox(
@@ -2056,6 +2585,25 @@ with gr.Blocks(
                 show_label=True
             )
             
+            # 新增：进度显示区域
+            with gr.Row(visible=False, elem_id="progress_container") as progress_row:
+                with gr.Column():
+                    progress_bar = gr.HTML(
+                        value='<div class="progress-wrapper"><div class="progress-bar" style="width: 0%"></div></div>',
+                        elem_id="progress_bar"
+                    )
+                    status_text = gr.Textbox(
+                        label="📊 生成状态",
+                        value="准备开始...",
+                        interactive=False,
+                        lines=2,
+                        elem_id="status_display"
+                    )
+                    estimated_time = gr.HTML(
+                        value="",
+                        elem_id="estimated_time"
+                    )
+            
             generate_btn = gr.Button(
                 "🤖 AI生成开发计划 + 编程提示词",
                 variant="primary",
@@ -2063,34 +2611,31 @@ with gr.Blocks(
                 elem_classes="generate-btn"
             )
         
-        with gr.Column(scale=1):
+        with gr.Column(scale=1, elem_classes="sidebar-compact"):
+            # 紧凑的创意提示
             gr.HTML("""
-            <div class="tips-box">
-                <h4 style="color: #e53e3e;">💡 创意提示</h4>
-                <ul>
-                    <li>描述核心功能和特性</li>
-                    <li>说明目标用户群体</li>
-                    <li>提及技术偏好或限制</li>
-                    <li>描述主要使用场景</li>
-                    <li>可以包含商业模式想法</li>
+            <div class="tips-box-compact">
+                <h4 style="color: #e53e3e; margin-bottom: 8px;">💡 创意提示</h4>
+                <ul style="margin: 8px 0; padding-left: 16px; font-size: 14px;">
+                    <li>描述核心功能</li>
+                    <li>说明目标用户</li>
+                    <li>提及技术偏好</li>
                 </ul>
-                <h4 style="color: #38a169;">🎯 AI增强功能</h4>
-                <ul>
-                    <li><span style="color: #e53e3e;">📋</span> 完整开发计划生成</li>
-                    <li><span style="color: #3182ce;">🤖</span> AI编程助手提示词</li>
-                    <li><span style="color: #38a169;">📝</span> 可直接用于编程工具</li>
-                    <li><span style="color: #805ad5;">🔗</span> 智能参考链接解析</li>
-                    <li><span style="color: #d69e2e;">🎨</span> 专业文档格式化</li>
-                </ul>
-                <h4 style="color: #3182ce;">📖 使用建议</h4>
-                <ul>
-                    <li><span style="color: #e53e3e;">✍️</span> 详细描述产品创意(10字以上)</li>
-                    <li><span style="color: #38a169;">🔗</span> 提供相关参考链接(可选)</li>
-                    <li><span style="color: #805ad5;">🎯</span> 明确目标用户和使用场景</li>
-                    <li><span style="color: #d69e2e;">⚡</span> 30秒即可获得完整方案</li>
-                </ul>
+                <h4 style="color: #38a169; margin-bottom: 8px;">🎯 功能特色</h4>
+                <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;">
+                    <span class="feature-tag">📋 开发计划</span>
+                    <span class="feature-tag">🤖 AI提示词</span>
+                    <span class="feature-tag">🔗 智能解析</span>
+                    <span class="feature-tag">🎨 专业格式</span>
+                </div>
             </div>
             """)
+            
+            # 紧凑的MCP状态显示
+            mcp_status_display = gr.HTML(
+                value=get_compact_mcp_status(),
+                elem_id="mcp_status_compact"
+            )
     
     # 结果显示区域
     with gr.Column(elem_classes="result-container"):
@@ -2270,14 +2815,19 @@ VibeDoc 是一个展示 **Agent应用** 能力的典型案例：
             visible=True
         )
     
+    # 修改生成按钮事件以支持流式进度显示
     generate_btn.click(
-        fn=generate_development_plan,
+        fn=stream_generation_with_progress,
         inputs=[idea_input, reference_url_input],
-        outputs=[plan_output, prompts_for_copy, download_file],
-        api_name="generate_plan"
+        outputs=[progress_row, progress_bar, status_text, estimated_time, plan_output, prompts_for_copy],
+        api_name="generate_plan_streaming"
     ).then(
-        fn=lambda: gr.update(visible=True),
-        outputs=[download_file]
+        fn=lambda plan, prompts: (
+            gr.update(visible=True) if plan and plan.strip() else gr.update(visible=False),
+            create_temp_markdown_file(plan) if plan and plan.strip() else None
+        ),
+        inputs=[plan_output, prompts_for_copy],
+        outputs=[download_file, download_file]
     ).then(
         fn=show_download_info,
         outputs=[download_info]
