@@ -1250,35 +1250,143 @@ details.gr-accordion:not([open]) {
     color: #E2E8F0;
 }
 
-/* Improve placeholder text contrast in dark mode */
-.dark #plan_output_area textarea::placeholder {
-    color: #9CA3AF !important;
+/* 重要：大幅改善dark模式下的文字对比度 */
+
+/* 主要内容区域 - AI生成内容显示区 */
+.dark #plan_result {
+    color: #F7FAFC !important;
+    background: #2D3748 !important;
 }
 
-/* Improve AI helper text contrast in dark mode */
-.dark #ai_helper_instructions {
-    color: #CBD5E0 !important;
-}
-
-.dark #ai_helper_instructions p {
-    color: #E2E8F0 !important;
-}
-
-.dark #ai_helper_instructions li {
-    color: #E2E8F0 !important;
-}
-
-.dark #ai_helper_instructions strong {
+.dark #plan_result p {
     color: #F7FAFC !important;
 }
 
-/* Improve plan output placeholder text contrast in dark mode */
-.dark #plan_output_area {
-    color: #E2E8F0 !important;
+.dark #plan_result strong {
+    color: #FFFFFF !important;
 }
 
-.dark #plan_output_area p {
-    color: #E2E8F0 !important;
+/* Dark模式下占位符样式优化 */
+.dark #plan_result div[style*="background: linear-gradient"] {
+    background: linear-gradient(135deg, #2D3748 0%, #4A5568 100%) !important;
+    border-color: #63B3ED !important;
+}
+
+.dark #plan_result h3 {
+    color: #FFFFFF !important;
+}
+
+.dark #plan_result div[style*="background: #edf2f7"] {
+    background: rgba(99, 179, 237, 0.2) !important;
+}
+
+/* 重点优化：AI编程助手使用说明区域 */
+.dark #ai_helper_instructions {
+    color: #F7FAFC !important;
+    background: rgba(45, 55, 72, 0.8) !important;
+}
+
+.dark #ai_helper_instructions p {
+    color: #F7FAFC !important;
+}
+
+.dark #ai_helper_instructions li {
+    color: #F7FAFC !important;
+}
+
+.dark #ai_helper_instructions strong {
+    color: #FFFFFF !important;
+}
+
+/* 生成内容的markdown渲染 - 主要问题区域 */
+.dark #plan_result {
+    color: #F7FAFC !important;
+    background: #2D3748 !important;
+}
+
+.dark #plan_result h1,
+.dark #plan_result h2,
+.dark #plan_result h3,
+.dark #plan_result h4,
+.dark #plan_result h5,
+.dark #plan_result h6 {
+    color: #FFFFFF !important;
+}
+
+.dark #plan_result p {
+    color: #F7FAFC !important;
+}
+
+.dark #plan_result li {
+    color: #F7FAFC !important;
+}
+
+.dark #plan_result strong {
+    color: #FFFFFF !important;
+}
+
+.dark #plan_result em {
+    color: #CBD5E0 !important;
+}
+
+/* 确保生成报告在dark模式下清晰可见 */
+.dark .plan-header {
+    background: linear-gradient(135deg, #4A5568 0%, #2D3748 100%) !important;
+    color: #FFFFFF !important;
+}
+
+.dark .meta-info {
+    background: rgba(255,255,255,0.2) !important;
+    color: #FFFFFF !important;
+}
+
+/* 提示词容器在dark模式下的优化 */
+.dark .prompts-highlight {
+    background: linear-gradient(135deg, #2D3748 0%, #4A5568 100%) !important;
+    border: 2px solid #63B3ED !important;
+    color: #F7FAFC !important;
+}
+
+.dark .prompt-section {
+    background: rgba(45, 55, 72, 0.9) !important;
+    color: #F7FAFC !important;
+    border-left: 4px solid #63B3ED !important;
+}
+
+/* 确保所有文字内容在dark模式下都清晰可见 */
+.dark textarea,
+.dark input {
+    color: #F7FAFC !important;
+    background: #2D3748 !important;
+}
+
+.dark .gr-markdown {
+    color: #F7FAFC !important;
+}
+
+/* 特别针对提示文字的优化 */
+.dark .tips-box {
+    background: #2D3748 !important;
+    color: #F7FAFC !important;
+}
+
+.dark .tips-box h4 {
+    color: #63B3ED !important;
+}
+
+.dark .tips-box li {
+    color: #F7FAFC !important;
+}
+
+/* 按钮在dark模式下的优化 */
+.dark .copy-btn {
+    color: #FFFFFF !important;
+}
+
+/* 确保Agent应用说明在dark模式下清晰 */
+.dark .gr-accordion {
+    color: #F7FAFC !important;
+    background: #2D3748 !important;
 }
 
 /* Loading spinner */
@@ -1398,8 +1506,24 @@ with gr.Blocks(
     # 结果显示区域
     with gr.Column(elem_classes="result-container"):
         plan_output = gr.Markdown(
-            value="💭 **AI生成的完整开发计划和编程提示词将在这里显示...**\n\n点击上方按钮开始生成您的专属开发计划和对应的AI编程助手提示词！",
-            elem_id="plan_output_area",
+            value="""
+<div style="text-align: center; padding: 2rem; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border-radius: 1rem; border: 2px dashed #cbd5e0;">
+    <div style="font-size: 3rem; margin-bottom: 1rem;">🤖</div>
+    <h3 style="color: #4a5568; margin-bottom: 1rem;">AI开发计划生成器</h3>
+    <p style="color: #718096; font-size: 1.1rem; margin-bottom: 1.5rem;">
+        💭 <strong>输入您的产品创意，AI将生成完整的开发计划和编程提示词</strong>
+    </p>
+    <div style="background: #edf2f7; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0;">
+        <p style="color: #4a5568; margin: 0;">
+            🎯 <strong>包含：</strong>技术方案 • 开发计划 • 部署策略 • AI编程提示词
+        </p>
+    </div>
+    <p style="color: #a0aec0; font-size: 0.9rem;">
+        点击上方"🤖 AI生成开发计划 + 编程提示词"按钮开始
+    </p>
+</div>
+            """,
+            elem_id="plan_result",
             label="AI生成的开发计划"
         )
         
