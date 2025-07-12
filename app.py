@@ -856,13 +856,326 @@ def enhance_markdown_structure(content: str) -> str:
     
     return '\n'.join(enhanced_lines)
 
-# 自定义CSS - 保持美化UI
+# 自定义CSS - 优化的UI布局
 custom_css = """
+/* ========================
+   🎨 主要布局优化
+   ======================== */
+
 .main-container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 20px;
 }
+
+.main-input-row {
+    gap: 2rem !important;
+    align-items: stretch !important;
+    margin: 2rem 0 !important;
+}
+
+.input-column {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    padding: 2rem;
+    border-radius: 1.5rem;
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.1);
+    border: 1px solid #e2e8f0;
+    min-height: 400px;
+}
+
+.dark .input-column {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border-color: #374151;
+}
+
+.tips-column {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    padding: 1.5rem;
+    border-radius: 1.5rem;
+    border: 2px solid #e5e7eb;
+    min-height: 400px;
+}
+
+.dark .tips-column {
+    background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+    border-color: #4b5563;
+}
+
+/* ========================
+   📝 输入组件优化
+   ======================== */
+
+.input-group {
+    background: rgba(255, 255, 255, 0.6) !important;
+    border-radius: 1rem !important;
+    padding: 1.5rem !important;
+    margin: 1.5rem 0 !important;
+    border: 2px solid rgba(59, 130, 246, 0.1) !important;
+}
+
+.dark .input-group {
+    background: rgba(55, 65, 81, 0.6) !important;
+    border-color: rgba(96, 165, 250, 0.2) !important;
+}
+
+.main-input textarea {
+    min-height: 180px !important;
+    font-size: 1rem !important;
+    line-height: 1.6 !important;
+    border-radius: 0.8rem !important;
+    border: 2px solid #e5e7eb !important;
+    padding: 1rem !important;
+    transition: all 0.3s ease !important;
+}
+
+.main-input textarea:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+.url-input textarea {
+    min-height: 60px !important;
+    font-size: 0.95rem !important;
+    border-radius: 0.8rem !important;
+    border: 2px solid #e5e7eb !important;
+    padding: 0.8rem !important;
+}
+
+.url-input textarea:focus {
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1) !important;
+}
+
+/* ========================
+   🚀 按钮优化
+   ======================== */
+
+.generate-btn-enhanced {
+    background: linear-gradient(45deg, #3b82f6, #1d4ed8) !important;
+    border: none !important;
+    color: white !important;
+    padding: 1.2rem 3rem !important;
+    border-radius: 2rem !important;
+    font-weight: 700 !important;
+    font-size: 1.2rem !important;
+    transition: all 0.4s ease !important;
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4) !important;
+    text-transform: none !important;
+    letter-spacing: 0.5px !important;
+    position: relative !important;
+    overflow: hidden !important;
+    margin: 2rem 0 1rem 0 !important;
+    width: 100% !important;
+}
+
+.generate-btn-enhanced:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 12px 35px rgba(59, 130, 246, 0.5) !important;
+    background: linear-gradient(45deg, #1d4ed8, #1e40af) !important;
+}
+
+.generate-btn-enhanced::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.generate-btn-enhanced:hover::before {
+    left: 100%;
+}
+
+/* ========================
+   💡 提示区域重设计
+   ======================== */
+
+.tips-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.tip-section {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    border-left: 4px solid #3b82f6;
+    transition: all 0.3s ease;
+}
+
+.tip-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+}
+
+.tip-section.primary {
+    border-left-color: #ef4444;
+}
+
+.tip-section.secondary {
+    border-left-color: #10b981;
+}
+
+.dark .tip-section {
+    background: rgba(55, 65, 81, 0.8);
+    color: #f8fafc;
+}
+
+.tip-section h4 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dark .tip-section h4 {
+    color: #f8fafc;
+}
+
+.tip-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.tip-item {
+    font-size: 0.9rem;
+    color: #4b5563;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(229, 231, 235, 0.3);
+}
+
+.tip-item:last-child {
+    border-bottom: none;
+}
+
+.dark .tip-item {
+    color: #d1d5db;
+    border-bottom-color: rgba(75, 85, 99, 0.3);
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.8rem;
+    background: rgba(59, 130, 246, 0.05);
+    border-radius: 0.8rem;
+    transition: all 0.3s ease;
+}
+
+.feature-item:hover {
+    background: rgba(59, 130, 246, 0.1);
+    transform: translateY(-1px);
+}
+
+.dark .feature-item {
+    background: rgba(96, 165, 250, 0.1);
+}
+
+.dark .feature-item:hover {
+    background: rgba(96, 165, 250, 0.15);
+}
+
+.feature-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.feature-text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.dark .feature-text {
+    color: #e5e7eb;
+}
+
+.quick-start {
+    margin-top: auto;
+    text-align: center;
+}
+
+.start-indicator {
+    background: linear-gradient(45deg, #10b981, #059669);
+    color: white;
+    padding: 0.8rem 1.5rem;
+    border-radius: 2rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: inline-block;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+/* ========================
+   🎯 标题优化
+   ======================== */
+
+#input_idea_title h2 {
+    color: #1f2937 !important;
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
+    margin-bottom: 1.5rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+}
+
+.dark #input_idea_title h2 {
+    color: #f8fafc !important;
+}
+
+/* ========================
+   📱 响应式设计
+   ======================== */
+
+@media (max-width: 768px) {
+    .main-input-row {
+        flex-direction: column !important;
+    }
+    
+    .input-column, .tips-column {
+        margin: 1rem 0 !important;
+        min-height: auto !important;
+    }
+    
+    .feature-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .generate-btn-enhanced {
+        font-size: 1rem !important;
+        padding: 1rem 2rem !important;
+    }
+}
+
+/* ========================
+   原有样式保持
+   ======================== */
 
 .header-gradient {
     background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
@@ -892,25 +1205,21 @@ custom_css = """
     100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
 }
 
-.content-card {
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-    padding: 2rem;
-    border-radius: 1.5rem;
-    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.1);
-    margin: 1rem 0;
-    border: 1px solid #e2e8f0;
-}
-
-.dark .content-card {
-    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-    border-color: #374151;
-}
-
 .result-container {
     background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
     border-radius: 1.5rem;
     padding: 2rem;
     margin: 2rem 0;
+    border: 2px solid #3b82f6;
+    box-shadow: 0 10px 30px rgba(59, 130, 246, 0.15);
+}
+
+.dark .result-container {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #60a5fa;
+}
+
+/* 保持原有的所有其他样式... */
     border: 2px solid #3b82f6;
     box-shadow: 0 10px 30px rgba(59, 130, 246, 0.15);
 }
@@ -2037,58 +2346,73 @@ with gr.Blocks(
     </script>
     """)
     
-    with gr.Row():
-        with gr.Column(scale=2, elem_classes="content-card"):
+    with gr.Row(elem_classes="main-input-row"):
+        with gr.Column(scale=3, elem_classes="input-column"):
             gr.Markdown("## 💡 输入您的产品创意", elem_id="input_idea_title")
             
-            idea_input = gr.Textbox(
-                label="产品创意描述",
-                placeholder="例如：我想做一个帮助程序员管理代码片段的工具，支持多语言语法高亮，可以按标签分类，还能分享给团队成员...",
-                lines=5,
-                max_lines=10,
-                show_label=False
-            )
-            
-            reference_url_input = gr.Textbox(
-                label="参考链接 (可选)",
-                placeholder="输入任何网页链接（如博客、新闻、文档）作为参考...",
-                lines=1,
-                show_label=True
-            )
+            with gr.Group(elem_classes="input-group"):
+                idea_input = gr.Textbox(
+                    label="产品创意描述",
+                    placeholder="例如：我想做一个帮助程序员管理代码片段的工具，支持多语言语法高亮，可以按标签分类，还能分享给团队成员...",
+                    lines=8,
+                    max_lines=12,
+                    show_label=False,
+                    elem_classes="main-input"
+                )
+                
+                reference_url_input = gr.Textbox(
+                    label="参考链接 (可选)",
+                    placeholder="输入任何网页链接（如博客、新闻、文档）作为参考...",
+                    lines=2,
+                    show_label=True,
+                    elem_classes="url-input"
+                )
             
             generate_btn = gr.Button(
-                "🤖 AI生成开发计划 + 编程提示词",
+                "🚀 AI生成开发计划 + 编程提示词",
                 variant="primary",
                 size="lg",
-                elem_classes="generate-btn"
+                elem_classes="generate-btn-enhanced"
             )
         
-        with gr.Column(scale=1):
+        with gr.Column(scale=2, elem_classes="tips-column"):
             gr.HTML("""
-            <div class="tips-box">
-                <h4 style="color: #e53e3e;">💡 创意提示</h4>
-                <ul>
-                    <li>描述核心功能和特性</li>
-                    <li>说明目标用户群体</li>
-                    <li>提及技术偏好或限制</li>
-                    <li>描述主要使用场景</li>
-                    <li>可以包含商业模式想法</li>
-                </ul>
-                <h4 style="color: #38a169;">🎯 AI增强功能</h4>
-                <ul>
-                    <li><span style="color: #e53e3e;">📋</span> 完整开发计划生成</li>
-                    <li><span style="color: #3182ce;">🤖</span> AI编程助手提示词</li>
-                    <li><span style="color: #38a169;">📝</span> 可直接用于编程工具</li>
-                    <li><span style="color: #805ad5;">🔗</span> 智能参考链接解析</li>
-                    <li><span style="color: #d69e2e;">🎨</span> 专业文档格式化</li>
-                </ul>
-                <h4 style="color: #3182ce;">📖 使用建议</h4>
-                <ul>
-                    <li><span style="color: #e53e3e;">✍️</span> 详细描述产品创意(10字以上)</li>
-                    <li><span style="color: #38a169;">🔗</span> 提供相关参考链接(可选)</li>
-                    <li><span style="color: #805ad5;">🎯</span> 明确目标用户和使用场景</li>
-                    <li><span style="color: #d69e2e;">⚡</span> 30秒即可获得完整方案</li>
-                </ul>
+            <div class="tips-container">
+                <div class="tip-section primary">
+                    <h4>💡 创意提示</h4>
+                    <div class="tip-items">
+                        <div class="tip-item">📝 描述核心功能和特性</div>
+                        <div class="tip-item">👥 说明目标用户群体</div>
+                        <div class="tip-item">⚙️ 提及技术偏好或限制</div>
+                        <div class="tip-item">🎯 描述主要使用场景</div>
+                    </div>
+                </div>
+                
+                <div class="tip-section secondary">
+                    <h4>🎯 AI增强功能</h4>
+                    <div class="feature-grid">
+                        <div class="feature-item">
+                            <span class="feature-icon">📋</span>
+                            <span class="feature-text">完整开发计划</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">🤖</span>
+                            <span class="feature-text">AI编程助手</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">🔗</span>
+                            <span class="feature-text">智能链接解析</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">🎨</span>
+                            <span class="feature-text">专业文档</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="quick-start">
+                    <div class="start-indicator">⚡ 30秒获得完整方案</div>
+                </div>
             </div>
             """)
     
