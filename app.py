@@ -141,17 +141,72 @@ def call_mcp_service(url: str, payload: Dict[str, Any], service_name: str, timeo
         return False, f"❌ {service_name} MCP调用错误: {str(e)}"
 
 def fetch_external_knowledge(reference_url: str) -> str:
-    """获取外部知识库内容 - 使用模块化MCP管理器"""
+    """获取外部知识库内容 - 使用模块化MCP管理器，防止虚假链接生成"""
     if not reference_url or not reference_url.strip():
         return ""
     
-    success, knowledge = mcp_manager.fetch_knowledge_from_url(reference_url.strip())
+    # 验证URL是否可访问
+    url = reference_url.strip()
+    try:
+        # 简单的HEAD请求检查URL是否存在
+        response = requests.head(url, timeout=5, allow_redirects=True)
+        if response.status_code >= 400:
+            logger.warning(f"⚠️ 提供的URL不可访问: {url} (HTTP {response.status_code})")
+            return f"""
+## ⚠️ 参考链接状态提醒
+
+**🔗 提供的链接**: {url}
+
+**❌ 链接状态**: 无法访问 (HTTP {response.status_code})
+
+**💡 建议**: 
+- 请检查链接是否正确
+- 或者移除参考链接，使用纯AI生成模式
+- AI将基于创意描述生成专业的开发方案
+
+---
+"""
+    except Exception as e:
+        logger.warning(f"⚠️ URL验证失败: {url} - {str(e)}")
+        return f"""
+## 🔗 参考链接处理说明
+
+**📍 提供的链接**: {url}
+
+**🔍 处理状态**: 暂时无法验证链接可用性
+
+**🤖 AI处理**: 将基于创意内容进行智能分析，不依赖外部链接
+
+**💡 说明**: 为确保生成质量，AI会根据创意描述生成完整方案，避免引用不确定的外部内容
+
+---
+"""
     
-    if success:
+    # 尝试调用MCP服务
+    success, knowledge = mcp_manager.fetch_knowledge_from_url(url)
+    
+    if success and knowledge and len(knowledge.strip()) > 50:
+        # MCP服务成功返回有效内容
         return knowledge
     else:
-        # 如果MCP调用失败，生成增强的参考信息
-        return generate_enhanced_reference_info(reference_url.strip(), "参考资料", knowledge)
+        # MCP服务失败或返回无效内容，提供明确说明
+        return f"""
+## 🔗 外部知识处理说明
+
+**📍 参考链接**: {url}
+
+**🎯 处理方式**: 智能分析模式
+
+**💭 说明**: 当前外部知识服务暂时不可用，AI将基于以下方式生成方案：
+- ✅ 基于创意描述进行深度分析
+- ✅ 结合行业最佳实践
+- ✅ 提供完整的技术方案
+- ✅ 生成实用的编程提示词
+
+**🎉 优势**: 确保生成内容的准确性和可靠性，避免引用不确定的外部信息
+
+---
+"""
 
 def generate_enhanced_reference_info(url: str, source_type: str, error_msg: str = None) -> str:
     """生成增强的参考信息，当MCP服务不可用时提供有用的上下文"""
@@ -325,7 +380,7 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
     # 获取外部知识库内容
     retrieved_knowledge = fetch_external_knowledge(reference_url)
     
-    # 构建系统提示词 - 改进版本，明确要求使用外部参考
+    # 构建系统提示词 - 防止虚假链接生成
     system_prompt = """你是一个资深技术项目经理，精通产品规划和 AI 编程助手（如 GitHub Copilot、ChatGPT Code）提示词撰写。
 
 🔴 重要要求：
@@ -333,6 +388,17 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
 2. 必须在开发计划的开头部分提及参考来源（如CSDN博客、GitHub项目等）
 3. 必须根据外部参考调整技术选型和实施建议
 4. 必须在相关章节中使用"参考XXX建议"等表述
+
+🚫 严禁行为：
+- 绝对不要编造虚假的链接或参考资料
+- 不要生成不存在的URL（如 xxx.com、example.com等）
+- 不要创建虚假的GitHub仓库链接
+- 不要引用不存在的CSDN博客文章
+
+✅ 正确做法：
+- 如果没有提供外部参考，直接基于创意进行分析
+- 只引用用户实际提供的参考链接
+- 当外部知识不可用时，明确说明是基于最佳实践生成
 
 🎯 编程提示词格式要求：
 - 编程提示词部分必须是纯文本的prompt，不要包含代码示例
@@ -970,6 +1036,43 @@ custom_css = """
     margin: 2rem 0;
 }
 
+/* Fix accordion height issue - Agent应用架构说明折叠问题 */
+.gradio-accordion {
+    transition: all 0.3s ease !important;
+    overflow: hidden !important;
+}
+
+.gradio-accordion[data-testid$="accordion"] {
+    min-height: auto !important;
+    height: auto !important;
+}
+
+.gradio-accordion .gradio-accordion-content {
+    transition: max-height 0.3s ease !important;
+    overflow: hidden !important;
+}
+
+/* Gradio内部accordion组件修复 */
+details.gr-accordion {
+    transition: all 0.3s ease !important;
+}
+
+details.gr-accordion[open] {
+    height: auto !important;
+    min-height: auto !important;
+}
+
+details.gr-accordion:not([open]) {
+    height: auto !important;
+    min-height: 50px !important;
+}
+
+/* 确保折叠后页面恢复正常大小 */
+.gr-block.gr-box {
+    transition: height 0.3s ease !important;
+    height: auto !important;
+}
+
 /* Fix for quick start text contrast */
 #quick_start_container p {
     color: #4A5568;
@@ -1096,19 +1199,6 @@ with gr.Blocks(
             )
         
         with gr.Column(scale=1):
-            # MCP服务状态监控
-            mcp_status_display = gr.HTML(
-                value=get_mcp_status_display(),
-                label="MCP服务状态"
-            )
-            
-            # 刷新按钮
-            refresh_status_btn = gr.Button(
-                "🔄 刷新状态",
-                variant="secondary",
-                size="sm"
-            )
-            
             gr.HTML("""
             <div class="tips-box">
                 <h4>💡 创意提示</h4>
@@ -1119,13 +1209,20 @@ with gr.Blocks(
                     <li>描述主要使用场景</li>
                     <li>可以包含商业模式想法</li>
                 </ul>
-                <h4>🎯 MCP服务增强</h4>
+                <h4>🎯 AI增强功能</h4>
                 <ul>
-                    <li>🔗 支持外部知识链接解析</li>
-                    <li>🧠 多MCP服务智能协作</li>
-                    <li>📚 DeepWiki技术文档集成</li>
-                    <li>🌐 通用网页内容抓取</li>
-                    <li>🎨 AI图像生成(可选)</li>
+                    <li>📋 完整开发计划生成</li>
+                    <li>🤖 AI编程助手提示词</li>
+                    <li>📝 可直接用于编程工具</li>
+                    <li>🔗 智能参考链接解析</li>
+                    <li>🎨 专业文档格式化</li>
+                </ul>
+                <h4>📖 使用建议</h4>
+                <ul>
+                    <li>✍️ 详细描述产品创意(10字以上)</li>
+                    <li>🔗 提供相关参考链接(可选)</li>
+                    <li>🎯 明确目标用户和使用场景</li>
+                    <li>⚡ 30秒即可获得完整方案</li>
                 </ul>
             </div>
             """)
@@ -1140,7 +1237,12 @@ with gr.Blocks(
         
         # 隐藏的组件用于复制和下载
         prompts_for_copy = gr.Textbox(visible=False)
-        download_file = gr.File(label="下载开发计划文档", visible=False)
+        download_file = gr.File(
+            label="📁 下载开发计划文档", 
+            visible=False,
+            interactive=False,
+            show_label=True
+        )
         
         # 添加复制和下载按钮
         with gr.Row():
@@ -1157,6 +1259,13 @@ with gr.Blocks(
                 elem_classes="copy-btn"
             )
             
+        # 下载提示信息
+        download_info = gr.HTML(
+            value="",
+            visible=False,
+            elem_id="download_info"
+        )
+            
         # 使用提示
         gr.HTML("""
         <div style="padding: 10px; background: #e3f2fd; border-radius: 8px; text-align: center;">
@@ -1168,27 +1277,27 @@ with gr.Blocks(
     gr.Markdown("## 🎯 快速开始示例", elem_id="quick_start_container")
     gr.Examples(
         examples=[
-            # 单MCP服务示例 - 展示DeepWiki集成（保留1个区块链例子）
+            # 单MCP服务示例 - 使用真实可访问的链接
             [
                 "我想开发一个智能投资助手，能够分析股票、基金数据，提供个性化投资建议和风险评估",
-                "https://docs.deepwiki.org/finance/investment-analysis"
+                "https://docs.python.org/3/library/sqlite3.html"
             ],
-            # 双MCP服务示例 - GitHub + 通用网页协作
+            # 双MCP服务示例 - 使用真实GitHub项目
             [
                 "创建一个在线教育平台，支持视频直播、作业批改、学习进度跟踪和师生互动功能",
-                "https://github.com/microsoft/vscode-education"
+                "https://github.com/microsoft/vscode"
             ],
-            # 三MCP服务示例 - 完整MCP生态展示（区块链例子）
+            # 三MCP服务示例 - 使用真实文档链接
             [
                 "开发一个数字藏品交易平台，支持NFT铸造、拍卖、展示和社区交流功能",
-                "https://docs.deepwiki.org/blockchain/nft-marketplace"
+                "https://ethereum.org/en/developers/docs/"
             ],
-            # 通用网页MCP示例 - 贴近生活
+            # 通用网页MCP示例 - 使用权威机构链接
             [
                 "构建一个智能健康管理系统，包含运动记录、饮食分析、健康报告和医生咨询功能",
-                "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+                "https://www.who.int/health-topics/physical-activity"
             ],
-            # 不使用MCP的纯AI示例 - 生活化场景
+            # 不使用MCP的纯AI示例
             [
                 "设计一个家庭理财助手APP，支持记账、预算规划、投资建议和账单提醒功能",
                 ""
@@ -1262,6 +1371,19 @@ VibeDoc 是一个展示 **Agent应用** 能力的典型案例：
         )
     
     # 绑定事件
+    def show_download_info():
+        return gr.update(
+            value="""
+            <div style="padding: 10px; background: #e8f5e8; border-radius: 8px; text-align: center; margin: 10px 0;">
+                ✅ <strong>文档已生成！</strong> 您现在可以：
+                <br>• 📋 复制开发计划或编程提示词
+                <br>• 📁 点击下方下载按钮保存文档
+                <br>• 🔄 调整创意重新生成
+            </div>
+            """,
+            visible=True
+        )
+    
     generate_btn.click(
         fn=generate_development_plan,
         inputs=[idea_input, reference_url_input],
@@ -1270,12 +1392,9 @@ VibeDoc 是一个展示 **Agent应用** 能力的典型案例：
     ).then(
         fn=lambda: gr.update(visible=True),
         outputs=[download_file]
-    )
-    
-    # MCP状态刷新
-    refresh_status_btn.click(
-        fn=get_mcp_status_display,
-        outputs=[mcp_status_display]
+    ).then(
+        fn=show_download_info,
+        outputs=[download_info]
     )
     
     # 复制按钮事件（使用JavaScript实现）
