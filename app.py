@@ -457,6 +457,23 @@ graph TD
     F --> G[上线运营]
 ```
 
+🎯 甘特图格式要求：
+```mermaid
+gantt
+    title 项目开发甘特图
+    dateFormat YYYY-MM-DD
+    section 需求分析
+    需求分析     :a1, 2024-01-01, 7d
+    section 系统设计
+    系统设计     :a2, after a1, 14d
+    section 开发实施
+    开发实施     :a3, after a2, 28d
+    section 测试部署
+    测试部署     :a4, after a3, 14d
+```
+
+🎯 必须严格按照Mermaid语法规范生成图表，不能有格式错误
+
 🎯 AI编程提示词格式要求（重要）：
 - 必须在开发计划后生成专门的"# AI编程助手提示词"部分
 - 每个功能模块必须有一个专门的AI编程提示词
@@ -848,56 +865,121 @@ custom_css = """
 }
 
 .header-gradient {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
     color: white;
-    padding: 30px;
-    border-radius: 15px;
+    padding: 2.5rem;
+    border-radius: 1.5rem;
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 2rem;
+    box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.header-gradient::before {
+    content: "";
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%);
+    animation: shine 3s infinite;
+}
+
+@keyframes shine {
+    0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+    100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
 }
 
 .content-card {
-    background: white;
-    padding: 25px;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    margin: 20px 0;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    padding: 2rem;
+    border-radius: 1.5rem;
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.1);
+    margin: 1rem 0;
+    border: 1px solid #e2e8f0;
+}
+
+.dark .content-card {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border-color: #374151;
 }
 
 .result-container {
-    background: #f8f9fa;
-    border-radius: 10px;
-    padding: 20px;
-    margin: 20px 0;
-    border-left: 4px solid #007bff;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 1.5rem;
+    padding: 2rem;
+    margin: 2rem 0;
+    border: 2px solid #3b82f6;
+    box-shadow: 0 10px 30px rgba(59, 130, 246, 0.15);
+}
+
+.dark .result-container {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #60a5fa;
 }
 
 .generate-btn {
-    background: linear-gradient(45deg, #007bff, #0056b3) !important;
+    background: linear-gradient(45deg, #3b82f6, #1d4ed8) !important;
     border: none !important;
     color: white !important;
-    padding: 15px 30px !important;
-    border-radius: 25px !important;
-    font-weight: bold !important;
-    font-size: 16px !important;
-    transition: all 0.3s ease !important;
+    padding: 1rem 2.5rem !important;
+    border-radius: 2rem !important;
+    font-weight: 700 !important;
+    font-size: 1.1rem !important;
+    transition: all 0.4s ease !important;
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    position: relative;
+    overflow: hidden;
 }
 
 .generate-btn:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 8px 20px rgba(0,123,255,0.3) !important;
+    transform: translateY(-3px) !important;
+    box-shadow: 0 12px 35px rgba(59, 130, 246, 0.5) !important;
+    background: linear-gradient(45deg, #1d4ed8, #1e40af) !important;
+}
+
+.generate-btn::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.generate-btn:hover::before {
+    left: 100%;
 }
 
 .tips-box {
-    background: #e3f2fd;
-    padding: 20px;
-    border-radius: 10px;
-    margin: 20px 0;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    padding: 1.5rem;
+    border-radius: 1.2rem;
+    margin: 1.5rem 0;
+    border: 2px solid #93c5fd;
+    box-shadow: 0 6px 20px rgba(147, 197, 253, 0.2);
+}
+
+.dark .tips-box {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #60a5fa;
 }
 
 .tips-box h4 {
-    color: #1976d2;
-    margin-bottom: 15px;
+    color: #1d4ed8;
+    margin-bottom: 1rem;
+    font-weight: 700;
+    font-size: 1.2rem;
+}
+
+.dark .tips-box h4 {
+    color: #60a5fa;
 }
 
 .tips-box ul {
@@ -1287,91 +1369,118 @@ custom_css = """
 
 /* Mermaid图表样式优化 */
 .mermaid {
-    background: #f8fafc !important;
-    border: 2px solid #e2e8f0 !important;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
+    border: 2px solid #3b82f6 !important;
     border-radius: 1rem !important;
-    padding: 1.5rem !important;
-    margin: 1.5rem 0 !important;
+    padding: 2rem !important;
+    margin: 2rem 0 !important;
     text-align: center !important;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15) !important;
 }
 
 .dark .mermaid {
-    background: #2d3748 !important;
-    border-color: #4a5568 !important;
-    color: #f7fafc !important;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+    border-color: #60a5fa !important;
+    color: #f8fafc !important;
 }
 
-/* Mermaid图表容器 */
+/* Mermaid图表容器增强 */
 .chart-container {
-    background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
-    border: 2px solid #4299e1;
-    border-radius: 1rem;
-    padding: 1.5rem;
-    margin: 1.5rem 0;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border: 3px solid #3b82f6;
+    border-radius: 1.5rem;
+    padding: 2rem;
+    margin: 2rem 0;
     text-align: center;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
+}
+
+.chart-container::before {
+    content: "📊";
+    position: absolute;
+    top: -1rem;
+    left: 2rem;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    padding: 0.8rem;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
 }
 
 .dark .chart-container {
-    background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
-    border-color: #63b3ed;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #60a5fa;
 }
 
-/* 表格样式增强 */
+.dark .chart-container::before {
+    background: linear-gradient(135deg, #60a5fa, #3b82f6);
+}
+
+/* 表格样式全面增强 */
 .enhanced-table {
     width: 100%;
     border-collapse: collapse;
-    margin: 1.5rem 0;
+    margin: 2rem 0;
     background: white;
-    border-radius: 0.8rem;
+    border-radius: 1rem;
     overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    border: 2px solid #e5e7eb;
 }
 
 .enhanced-table th {
-    background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
     color: white;
-    padding: 1rem;
+    padding: 1.2rem;
     text-align: left;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .enhanced-table td {
-    padding: 0.8rem 1rem;
-    border-bottom: 1px solid #e2e8f0;
+    padding: 1rem 1.2rem;
+    border-bottom: 1px solid #e5e7eb;
     vertical-align: top;
+    font-size: 0.95rem;
+    line-height: 1.6;
 }
 
 .enhanced-table tr:nth-child(even) {
-    background: #f8fafc;
+    background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
 .enhanced-table tr:hover {
-    background: #ebf8ff;
-    transform: scale(1.01);
-    transition: all 0.2s ease;
+    background: linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%);
+    transform: translateY(-1px);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.1);
 }
 
 .dark .enhanced-table {
-    background: #2d3748;
+    background: #1f2937;
+    border-color: #374151;
 }
 
 .dark .enhanced-table th {
-    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    color: #f9fafb;
 }
 
 .dark .enhanced-table td {
-    border-bottom-color: #4a5568;
-    color: #f7fafc;
+    border-bottom-color: #374151;
+    color: #f9fafb;
 }
 
 .dark .enhanced-table tr:nth-child(even) {
-    background: #374151;
+    background: linear-gradient(90deg, #374151 0%, #1f2937 100%);
 }
 
 .dark .enhanced-table tr:hover {
-    background: #4a5568;
+    background: linear-gradient(90deg, #4b5563 0%, #374151 100%);
 }
 
 /* 单独复制按钮样式 */
@@ -1570,8 +1679,8 @@ details.gr-accordion:not([open]) {
 
 /* 生成内容的markdown渲染 - 主要问题区域 */
 .dark #plan_result {
-    color: #F7FAFC !important;
-    background: #2D3748 !important;
+    color: #FFFFFF !important;
+    background: #1A202C !important;
 }
 
 .dark #plan_result h1,
@@ -1584,11 +1693,11 @@ details.gr-accordion:not([open]) {
 }
 
 .dark #plan_result p {
-    color: #F7FAFC !important;
+    color: #FFFFFF !important;
 }
 
 .dark #plan_result li {
-    color: #F7FAFC !important;
+    color: #FFFFFF !important;
 }
 
 .dark #plan_result strong {
@@ -1596,7 +1705,39 @@ details.gr-accordion:not([open]) {
 }
 
 .dark #plan_result em {
-    color: #CBD5E0 !important;
+    color: #E2E8F0 !important;
+}
+
+.dark #plan_result td {
+    color: #FFFFFF !important;
+    background: #2D3748 !important;
+}
+
+.dark #plan_result th {
+    color: #FFFFFF !important;
+    background: #1A365D !important;
+}
+
+/* 确保所有文字内容都是白色 */
+.dark #plan_result * {
+    color: #FFFFFF !important;
+}
+
+/* 特殊元素保持样式 */
+.dark #plan_result code {
+    color: #81E6D9 !important;
+    background: #1A202C !important;
+}
+
+.dark #plan_result pre {
+    background: #0D1117 !important;
+    color: #F0F6FC !important;
+}
+
+.dark #plan_result blockquote {
+    color: #FFFFFF !important;
+    background: #2D3748 !important;
+    border-left-color: #63B3ED !important;
 }
 
 /* 确保生成报告在dark模式下清晰可见 */
@@ -1757,12 +1898,16 @@ with gr.Blocks(
             startOnLoad: true,
             theme: 'default',
             themeVariables: {
-                primaryColor: '#4299e1',
-                primaryTextColor: '#1a202c',
-                primaryBorderColor: '#3182ce',
-                lineColor: '#4a5568',
-                secondaryColor: '#ebf8ff',
-                tertiaryColor: '#f7fafc'
+                primaryColor: '#3b82f6',
+                primaryTextColor: '#1f2937',
+                primaryBorderColor: '#1d4ed8',
+                lineColor: '#6b7280',
+                secondaryColor: '#dbeafe',
+                tertiaryColor: '#f8fafc',
+                background: '#ffffff',
+                mainBkg: '#ffffff',
+                secondBkg: '#f1f5f9',
+                tertiaryBkg: '#eff6ff'
             }
         });
         
@@ -1774,19 +1919,27 @@ with gr.Blocks(
                 startOnLoad: true,
                 theme: theme,
                 themeVariables: isDark ? {
-                    primaryColor: '#4a5568',
-                    primaryTextColor: '#f7fafc',
-                    primaryBorderColor: '#63b3ed',
-                    lineColor: '#a0aec0',
-                    secondaryColor: '#2d3748',
-                    tertiaryColor: '#1a202c'
+                    primaryColor: '#60a5fa',
+                    primaryTextColor: '#f8fafc',
+                    primaryBorderColor: '#3b82f6',
+                    lineColor: '#94a3b8',
+                    secondaryColor: '#1e293b',
+                    tertiaryColor: '#0f172a',
+                    background: '#1f2937',
+                    mainBkg: '#1f2937',
+                    secondBkg: '#374151',
+                    tertiaryBkg: '#1e293b'
                 } : {
-                    primaryColor: '#4299e1',
-                    primaryTextColor: '#1a202c',
-                    primaryBorderColor: '#3182ce',
-                    lineColor: '#4a5568',
-                    secondaryColor: '#ebf8ff',
-                    tertiaryColor: '#f7fafc'
+                    primaryColor: '#3b82f6',
+                    primaryTextColor: '#1f2937',
+                    primaryBorderColor: '#1d4ed8',
+                    lineColor: '#6b7280',
+                    secondaryColor: '#dbeafe',
+                    tertiaryColor: '#f8fafc',
+                    background: '#ffffff',
+                    mainBkg: '#ffffff',
+                    secondBkg: '#f1f5f9',
+                    tertiaryBkg: '#eff6ff'
                 }
             });
         }
