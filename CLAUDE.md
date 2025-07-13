@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-VibeDoc is an AI-driven development plan generator designed for the Magic Tower MCP & Agent Challenge 2025. It's a sophisticated Agent application that converts creative ideas into comprehensive development plans within 30 seconds.
+VibeDoc is an AI-driven development plan generator designed for the Magic Tower MCP & Agent Challenge 2025. It's a sophisticated Agent application that converts creative ideas into comprehensive development plans within 60 seconds.
 
 ### Core Technology Stack
 - **Backend**: Python 3.11 + Gradio 5.34.1
