@@ -6,6 +6,7 @@ MCP服务管理器
 import asyncio
 import json
 import logging
+import os
 import time
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
@@ -418,6 +419,62 @@ class MCPServiceManager:
         """
         
         return status_html
+    
+    def get_debug_status(self) -> str:
+        """获取详细的调试状态信息"""
+        debug_lines = [
+            "## 🔧 MCP服务详细诊断",
+            "",
+            "### 📋 环境变量检查:",
+        ]
+        
+        env_vars = {
+            "DEEPWIKI_SSE_URL": os.getenv("DEEPWIKI_SSE_URL"),
+            "FETCH_SSE_URL": os.getenv("FETCH_SSE_URL"), 
+            "DOUBAO_SSE_URL": os.getenv("DOUBAO_SSE_URL"),
+            "DOUBAO_API_KEY": os.getenv("DOUBAO_API_KEY")
+        }
+        
+        for var_name, var_value in env_vars.items():
+            if var_value:
+                debug_lines.append(f"- **{var_name}**: ✅ 已设置 ({var_value[:50]}...)")
+            else:
+                debug_lines.append(f"- **{var_name}**: ❌ 未设置")
+        
+        debug_lines.extend([
+            "",
+            "### 🔍 服务配置状态:"
+        ])
+        
+        for service_key, service_config in self.services.items():
+            stats = self.service_stats[service_key]
+            debug_lines.append(f"")
+            debug_lines.append(f"**{service_config.name}** ({service_key}):")
+            debug_lines.append(f"- URL: {service_config.url or '未配置'}")
+            debug_lines.append(f"- 启用状态: {'✅' if service_config.enabled else '❌'}")
+            debug_lines.append(f"- 超时设置: {service_config.timeout}秒")
+            debug_lines.append(f"- 总调用次数: {stats['total_calls']}")
+            debug_lines.append(f"- 成功次数: {stats['successful_calls']}")
+            debug_lines.append(f"- 失败次数: {stats['failed_calls']}")
+            if stats['average_response_time'] > 0:
+                debug_lines.append(f"- 平均响应时间: {stats['average_response_time']:.2f}秒")
+        
+        debug_lines.extend([
+            "",
+            "### 📊 调用历史 (最近5次):"
+        ])
+        
+        recent_calls = self.call_history[-5:] if self.call_history else []
+        if recent_calls:
+            for i, call in enumerate(recent_calls, 1):
+                status_emoji = "✅" if call.success else "❌"
+                debug_lines.append(f"{i}. {status_emoji} {call.service_name} - {call.execution_time:.2f}s")
+                if call.error_message:
+                    debug_lines.append(f"   错误: {call.error_message}")
+        else:
+            debug_lines.append("暂无调用历史")
+        
+        return "\n".join(debug_lines)
 
 # 全局MCP服务管理器实例
 mcp_manager = MCPServiceManager()

@@ -4,7 +4,7 @@ import os
 import logging
 import json
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Tuple, Dict, Any
 from urllib.parse import urlparse
 
@@ -280,6 +280,203 @@ def generate_enhanced_reference_info(url: str, source_type: str, error_msg: str 
     
     return reference_info
 
+def validate_and_fix_content(content: str) -> str:
+    """验证和修复生成的内容，包括Mermaid语法、链接验证等"""
+    if not content:
+        return content
+    
+    logger.info("🔍 开始内容验证和修复...")
+    
+    # 计算质量分数
+    quality_score = calculate_quality_score(content)
+    logger.info(f"📊 内容质量分数: {quality_score}/100")
+    
+    # 1. 修复Mermaid图表语法错误
+    content = fix_mermaid_syntax(content)
+    
+    # 2. 验证和清理虚假链接
+    content = validate_and_clean_links(content)
+    
+    # 3. 修复日期一致性
+    content = fix_date_consistency(content)
+    
+    # 4. 修复格式问题
+    content = fix_formatting_issues(content)
+    
+    # 重新计算质量分数
+    final_quality_score = calculate_quality_score(content)
+    logger.info(f"✅ 内容验证和修复完成，最终质量分数: {final_quality_score}/100")
+    
+    return content
+
+def calculate_quality_score(content: str) -> int:
+    """计算内容质量分数（0-100）"""
+    if not content:
+        return 0
+    
+    score = 0
+    max_score = 100
+    
+    # 1. 基础内容完整性 (30分)
+    if len(content) > 500:
+        score += 15
+    if len(content) > 2000:
+        score += 15
+    
+    # 2. 结构完整性 (25分)
+    structure_checks = [
+        '# 🚀 AI生成的开发计划',  # 标题
+        '## 🤖 AI编程助手提示词',   # AI提示词部分
+        '```mermaid',              # Mermaid图表
+        '项目开发甘特图',           # 甘特图
+    ]
+    
+    for check in structure_checks:
+        if check in content:
+            score += 6
+    
+    # 3. 日期准确性 (20分)
+    import re
+    current_year = datetime.now().year
+    
+    # 检查是否有当前年份或以后的日期
+    recent_dates = re.findall(r'202[5-9]-\d{2}-\d{2}', content)
+    if recent_dates:
+        score += 10
+    
+    # 检查是否没有过期日期
+    old_dates = re.findall(r'202[0-3]-\d{2}-\d{2}', content)
+    if not old_dates:
+        score += 10
+    
+    # 4. 链接质量 (15分)
+    fake_link_patterns = [
+        r'blog\.csdn\.net/username',
+        r'github\.com/username', 
+        r'example\.com',
+        r'xxx\.com'
+    ]
+    
+    has_fake_links = any(re.search(pattern, content, re.IGNORECASE) for pattern in fake_link_patterns)
+    if not has_fake_links:
+        score += 15
+    
+    # 5. Mermaid语法质量 (10分)
+    mermaid_issues = [
+        r'## 🎯 [A-Z]',  # 错误的标题在图表中
+        r'```mermaid\n## 🎯',  # 格式错误
+    ]
+    
+    has_mermaid_issues = any(re.search(pattern, content, re.MULTILINE) for pattern in mermaid_issues)
+    if not has_mermaid_issues:
+        score += 10
+    
+    return min(score, max_score)
+
+def fix_mermaid_syntax(content: str) -> str:
+    """修复Mermaid图表中的语法错误"""
+    import re
+    
+    # 修复常见的Mermaid语法错误
+    fixes = [
+        # 移除图表代码中的额外符号和标记
+        (r'## 🎯 ([A-Z]\s*-->)', r'\1'),
+        (r'## 🎯 (section [^)]+)', r'\1'),
+        (r'(\n|\r\n)## 🎯 ([A-Z]\s*-->)', r'\n    \2'),
+        (r'(\n|\r\n)## 🎯 (section [^\n]+)', r'\n    \2'),
+        
+        # 修复节点定义中的多余符号
+        (r'## 🎯 ([A-Z]\[[^\]]+\])', r'\1'),
+        
+        # 确保Mermaid代码块格式正确
+        (r'```mermaid\n## 🎯', r'```mermaid'),
+        
+        # 移除标题级别错误
+        (r'\n##+ 🎯 ([A-Z])', r'\n    \1'),
+    ]
+    
+    for pattern, replacement in fixes:
+        content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
+    
+    return content
+
+def validate_and_clean_links(content: str) -> str:
+    """验证和清理虚假链接"""
+    import re
+    
+    # 检测并移除虚假链接模式
+    fake_link_patterns = [
+        r'\[([^\]]+)\]\(https?://blog\.csdn\.net/username/article/details/\d+\)',
+        r'\[([^\]]+)\]\(https?://github\.com/username/[^\)]+\)',
+        r'\[([^\]]+)\]\(https?://[^/]*example\.com[^\)]*\)',
+        r'\[([^\]]+)\]\(https?://[^/]*xxx\.com[^\)]*\)',
+        r'https?://blog\.csdn\.net/username/article/details/\d+',
+        r'https?://github\.com/username/[^\s\)]+',
+    ]
+    
+    for pattern in fake_link_patterns:
+        # 将虚假链接替换为普通文本描述
+        def replace_fake_link(match):
+            if match.groups():
+                return f"**{match.group(1)}** (基于行业标准)"
+            else:
+                return "（基于行业最佳实践）"
+        
+        content = re.sub(pattern, replace_fake_link, content, flags=re.IGNORECASE)
+    
+    return content
+
+def fix_date_consistency(content: str) -> str:
+    """修复日期一致性问题"""
+    import re
+    from datetime import datetime
+    
+    current_year = datetime.now().year
+    
+    # 替换2024年以前的日期为当前年份
+    old_year_patterns = [
+        r'202[0-3]-\d{2}-\d{2}',  # 2020-2023的日期
+        r'202[0-3]年',            # 2020-2023年
+    ]
+    
+    for pattern in old_year_patterns:
+        def replace_old_date(match):
+            old_date = match.group(0)
+            if '-' in old_date:
+                # 日期格式：YYYY-MM-DD
+                parts = old_date.split('-')
+                return f"{current_year}-{parts[1]}-{parts[2]}"
+            else:
+                # 年份格式：YYYY年
+                return f"{current_year}年"
+        
+        content = re.sub(pattern, replace_old_date, content)
+    
+    return content
+
+def fix_formatting_issues(content: str) -> str:
+    """修复格式问题"""
+    import re
+    
+    # 修复常见的格式问题
+    fixes = [
+        # 修复空的或格式错误的标题
+        (r'#### 🚀 \*\*$', r'#### 🚀 **开发阶段**'),
+        (r'#### 🚀 第阶段：\*\*', r'#### 🚀 **第1阶段**：'),
+        (r'### 📋 (\d+)\. \*\*第\d+阶段', r'### 📋 \1. **第\1阶段'),
+        
+        # 修复多余的空行
+        (r'\n{4,}', r'\n\n\n'),
+        
+        # 修复不完整的段落结束
+        (r'##\n\n---', r'## 总结\n\n以上是完整的开发计划和技术方案。\n\n---'),
+    ]
+    
+    for pattern, replacement in fixes:
+        content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
+    
+    return content
+
 def generate_concept_logo(user_idea: str) -> str:
     """生成概念LOGO和架构图 - 使用模块化配置"""
     doubao_service = config.get_mcp_service("doubao")
@@ -418,8 +615,20 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
     # 获取外部知识库内容
     retrieved_knowledge = fetch_external_knowledge(reference_url)
     
-    # 构建系统提示词 - 防止虚假链接生成，强化编程提示词生成，增强视觉化内容
-    system_prompt = """你是一个资深技术项目经理，精通产品规划和 AI 编程助手（如 GitHub Copilot、ChatGPT Code）提示词撰写。
+    # 获取当前日期并计算项目开始日期
+    current_date = datetime.now()
+    # 项目开始日期：下周一开始（给用户准备时间）
+    days_until_monday = (7 - current_date.weekday()) % 7
+    if days_until_monday == 0:  # 如果今天是周一，则下周一开始
+        days_until_monday = 7
+    project_start_date = current_date + timedelta(days=days_until_monday)
+    project_start_str = project_start_date.strftime("%Y-%m-%d")
+    current_year = current_date.year
+    
+    # 构建系统提示词 - 防止虚假链接生成，强化编程提示词生成，增强视觉化内容，加强日期上下文
+    system_prompt = f"""你是一个资深技术项目经理，精通产品规划和 AI 编程助手（如 GitHub Copilot、ChatGPT Code）提示词撰写。
+
+📅 **当前时间上下文**：今天是 {current_date.strftime("%Y年%m月%d日")}，当前年份是 {current_year} 年。所有项目时间必须基于当前时间合理规划。
 
 🔴 重要要求：
 1. 当收到外部知识库参考时，你必须在开发计划中明确引用和融合这些信息
@@ -428,16 +637,18 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
 4. 必须在相关章节中使用"参考XXX建议"等表述
 5. 开发阶段必须有明确编号（第1阶段、第2阶段等）
 
-🚫 严禁行为：
-- 绝对不要编造虚假的链接或参考资料
-- 不要生成不存在的URL（如 xxx.com、example.com等）
-- 不要创建虚假的GitHub仓库链接
-- 不要引用不存在的CSDN博客文章
+🚫 严禁行为（重要）：
+- **绝对不要编造虚假的链接或参考资料**
+- **不要生成不存在的URL（如 xxx.com、example.com、username等占位符）**
+- **不要创建虚假的GitHub仓库链接（如 github.com/username/项目名）**
+- **不要引用不存在的CSDN博客文章（如 blog.csdn.net/username/article/details/123456789）**
+- **不要使用 "参考1"、"参考2" 等编号来标注虚假链接**
 
 ✅ 正确做法：
 - 如果没有提供外部参考，直接基于创意进行分析
 - 只引用用户实际提供的参考链接
 - 当外部知识不可用时，明确说明是基于最佳实践生成
+- 使用 "基于行业标准"、"参考常见架构" 等表述，而不是虚假链接
 
 📊 视觉化内容要求（新增）：
 - 必须在技术方案中包含架构图的Mermaid代码
@@ -457,13 +668,13 @@ graph TD
     F --> G[上线运营]
 ```
 
-🎯 甘特图格式要求：
+🎯 甘特图格式要求（必须使用真实的项目开始日期）：
 ```mermaid
 gantt
     title 项目开发甘特图
     dateFormat YYYY-MM-DD
     section 需求分析
-    需求分析     :a1, 2025-01-01, 7d
+    需求分析     :a1, {project_start_str}, 7d
     section 系统设计
     系统设计     :a2, after a1, 14d
     section 开发实施
@@ -471,6 +682,12 @@ gantt
     section 测试部署
     测试部署     :a4, after a3, 14d
 ```
+
+⚠️ **日期生成规则**：
+- 项目开始日期：{project_start_str}（下周一开始）
+- 所有日期必须基于 {current_year} 年及以后
+- 严禁使用 2024 年以前的日期
+- 里程碑日期必须与甘特图保持一致
 
 🎯 必须严格按照Mermaid语法规范生成图表，不能有格式错误
 
@@ -559,6 +776,9 @@ gantt
             if content:
                 # 后处理：确保内容结构化
                 final_plan_text = format_response(content)
+                
+                # 应用内容验证和修复
+                final_plan_text = validate_and_fix_content(final_plan_text)
                 
                 # 生成概念LOGO图像
                 logo_content = generate_concept_logo(user_idea)
