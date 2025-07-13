@@ -615,6 +615,10 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
     # 获取外部知识库内容
     retrieved_knowledge = fetch_external_knowledge(reference_url)
     
+    # 添加MCP服务状态信息到生成结果中
+    mcp_status = mcp_manager.get_status_summary()
+    mcp_debug = mcp_manager.get_debug_info()
+    
     # 获取当前日期并计算项目开始日期
     current_date = datetime.now()
     # 项目开始日期：下周一开始（给用户准备时间）
@@ -775,7 +779,7 @@ gantt
             content = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
             if content:
                 # 后处理：确保内容结构化
-                final_plan_text = format_response(content)
+                final_plan_text = format_response(content, mcp_status, mcp_debug)
                 
                 # 应用内容验证和修复
                 final_plan_text = validate_and_fix_content(final_plan_text)
@@ -832,8 +836,8 @@ def create_temp_markdown_file(content: str) -> str:
         logger.error(f"Failed to create temporary file: {e}")
         return ""
 
-def format_response(content: str) -> str:
-    """格式化AI回复，美化显示并保持原始AI生成的提示词"""
+def format_response(content: str, mcp_status: str = "", mcp_debug: str = "") -> str:
+    """格式化AI回复，美化显示并保持原始AI生成的提示词，添加MCP服务协作展示"""
     
     # 添加时间戳和格式化标题
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -848,6 +852,35 @@ def format_response(content: str) -> str:
         
         # 美化AI编程提示词部分
         enhanced_prompts = enhance_prompts_display(prompts_content)
+        
+        # 构建MCP服务协作展示
+        mcp_collaboration_display = ""
+        if mcp_status or mcp_debug:
+            mcp_collaboration_display = f"""
+
+---
+
+## 🔗 Agent MCP服务协作详情
+
+<div class="mcp-status-section">
+
+### 📊 多服务协作状态
+
+{mcp_status if mcp_status else "本次生成未使用外部MCP服务，基于AI内置知识库生成"}
+
+### 🔧 技术协作过程
+
+{mcp_debug if mcp_debug else "```
+💭 深度分析模式
+├── 🧠 AI推理引擎: 创意理解与需求分析
+├── 🎯 智能路由系统: 根据内容类型选择最佳服务
+├── 🔄 多源知识融合: 整合外部知识与内置专业知识
+└── 📋 结构化输出: 生成企业级开发计划
+```"}
+
+</div>
+
+---"""
         
         formatted_content = f"""
 <div class="plan-header">
@@ -867,7 +900,7 @@ def format_response(content: str) -> str:
 
 ---
 
-{enhance_markdown_structure(plan_content)}
+{enhance_markdown_structure(plan_content)}{mcp_collaboration_display}
 
 ---
 
@@ -2065,6 +2098,59 @@ details.gr-accordion:not([open]) {
     color: #F7FAFC !important;
 }
 
+/* MCP服务协作状态展示 */
+.mcp-status-section {
+    background: linear-gradient(135deg, #f0f9ff 0%, #ecfdf5 100%);
+    border: 2px solid #06b6d4;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    position: relative;
+}
+
+.mcp-status-section::before {
+    content: "🔗";
+    position: absolute;
+    top: -10px;
+    left: 20px;
+    background: #06b6d4;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.mcp-status-section h3 {
+    color: #0369a1 !important;
+    margin-bottom: 15px;
+    font-weight: bold;
+}
+
+.mcp-status-section pre {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 15px;
+    overflow-x: auto;
+    color: #334155;
+}
+
+.dark .mcp-status-section {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border-color: #0ea5e9;
+}
+
+.dark .mcp-status-section h3 {
+    color: #38bdf8 !important;
+}
+
+.dark .mcp-status-section pre {
+    background: #1e293b;
+    border-color: #334155;
+    color: #f1f5f9;
+}
+
 .dark .tips-box h4 {
     color: #63B3ED !important;
 }
@@ -2171,7 +2257,7 @@ with gr.Blocks(
             AI驱动的智能开发计划生成器
         </p>
         <p style="opacity: 0.85;">
-            30秒内将创意转化为完整开发方案 + 专业编程提示词
+            60秒深度分析，将创意转化为企业级开发方案 + 专业编程提示词
         </p>
     </div>
     
@@ -2341,7 +2427,7 @@ with gr.Blocks(
             )
             
             generate_btn = gr.Button(
-                "🤖 AI生成开发计划 + 编程提示词",
+                "🧠 深度分析 - 企业级开发计划生成",
                 variant="primary",
                 size="lg",
                 elem_classes="generate-btn"
@@ -2353,20 +2439,20 @@ with gr.Blocks(
                 <h4 style="color: #e53e3e;">💡 简单三步</h4>
                 <div style="font-size: 16px; font-weight: 600; text-align: center; margin: 20px 0;">
                     <span style="color: #e53e3e;">创意描述</span> → 
-                    <span style="color: #38a169;">智能分析</span> → 
+                    <span style="color: #38a169;">深度分析</span> → 
                     <span style="color: #3182ce;">完整方案</span>
                 </div>
-                <h4 style="color: #38a169;">🎯 核心功能</h4>
+                <h4 style="color: #38a169;">🎯 深度分析流程</h4>
                 <ul>
-                    <li><span style="color: #e53e3e;">📋</span> 开发计划</li>
-                    <li><span style="color: #3182ce;">🤖</span> 编程提示词</li>
-                    <li><span style="color: #38a169;">📝</span> 直接可用</li>
+                    <li><span style="color: #e53e3e;">📊</span> 需求理解与市场分析</li>
+                    <li><span style="color: #3182ce;">🔗</span> MCP服务协作</li>
+                    <li><span style="color: #38a169;">📋</span> 企业级方案输出</li>
                 </ul>
                 <h4 style="color: #3182ce;">📖 使用提示</h4>
                 <ul>
                     <li><span style="color: #e53e3e;">✍️</span> 详细描述创意</li>
                     <li><span style="color: #38a169;">🔗</span> 可添加参考链接</li>
-                    <li><span style="color: #d69e2e;">⚡</span> 30秒获得方案</li>
+                    <li><span style="color: #d69e2e;">⚡</span> 60秒深度分析</li>
                 </ul>
             </div>
             """)
@@ -2377,7 +2463,7 @@ with gr.Blocks(
             value="""
 <div style="text-align: center; padding: 2rem; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border-radius: 1rem; border: 2px dashed #cbd5e0;">
     <div style="font-size: 3rem; margin-bottom: 1rem;">🤖</div>
-    <h3 style="color: #2b6cb0; margin-bottom: 1rem; font-weight: bold;">智能开发计划生成</h3>
+    <h3 style="color: #2b6cb0; margin-bottom: 1rem; font-weight: bold;">企业级开发计划生成</h3>
     <p style="color: #4a5568; font-size: 1.1rem; margin-bottom: 1.5rem;">
         💭 <strong style="color: #e53e3e;">输入创意，获得完整开发方案</strong>
     </p>
@@ -2387,7 +2473,7 @@ with gr.Blocks(
         </p>
     </div>
     <p style="color: #a0aec0; font-size: 0.9rem;">
-        点击 <span style="color: #e53e3e; font-weight: bold;">"🤖 AI生成开发计划"</span> 按钮开始
+        点击 <span style="color: #e53e3e; font-weight: bold;">"🧠 深度分析"</span> 开始企业级方案生成
     </p>
 </div>
             """,
