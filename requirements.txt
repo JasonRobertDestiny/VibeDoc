@@ -1,20 +1,8 @@
-# VibeDoc Agent Application Dependencies
-# Core Gradio framework for web interface
 gradio==5.34.1
-
-# HTTP client for API calls and MCP service communication
 requests>=2.31.0
-
-# Environment variables management
 python-dotenv>=0.19.0
-
-# Network and security
 urllib3>=1.26.0
 certifi>=2022.12.7
-
-# Text processing and validation
 markdown>=3.4.0
 pydantic>=1.10.0
-
-# Type hinting support for older Python versions
 typing-extensions>=4.4.0
