@@ -2038,7 +2038,7 @@ with gr.Blocks(
     """)
     
     with gr.Row():
-        with gr.Column(scale=2, elem_classes="content-card"):
+        with gr.Column(scale=3, elem_classes="content-card"):
             gr.Markdown("## 💡 输入您的产品创意", elem_id="input_idea_title")
             
             idea_input = gr.Textbox(
@@ -2063,7 +2063,7 @@ with gr.Blocks(
                 elem_classes="generate-btn"
             )
         
-        with gr.Column(scale=1):
+        with gr.Column(scale=2):
             gr.HTML("""
             <div class="tips-box">
                 <h4 style="color: #e53e3e;">💡 创意提示</h4>
