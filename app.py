@@ -2166,12 +2166,12 @@ with gr.Blocks(
     
     gr.HTML("""
     <div class="header-gradient">
-        <h1>🚀 VibeDoc Agent：您的随身AI产品经理与架构师</h1>
+        <h1>🚀 VibeDoc：您的随身AI产品经理与架构师</h1>
         <p style="font-size: 18px; margin: 15px 0; opacity: 0.95;">
-            基于AI的Agent应用，集成多种MCP服务提供智能开发计划生成
+            AI驱动的智能开发计划生成器
         </p>
         <p style="opacity: 0.85;">
-            一键将创意转化为完整的开发方案 + AI编程助手提示词，展示Agent应用与MCP服务协作能力
+            30秒内将创意转化为完整开发方案 + 专业编程提示词
         </p>
     </div>
     
@@ -2350,28 +2350,23 @@ with gr.Blocks(
         with gr.Column(scale=1):
             gr.HTML("""
             <div class="tips-box">
-                <h4 style="color: #e53e3e;">💡 创意提示</h4>
+                <h4 style="color: #e53e3e;">💡 简单三步</h4>
+                <div style="font-size: 16px; font-weight: 600; text-align: center; margin: 20px 0;">
+                    <span style="color: #e53e3e;">创意描述</span> → 
+                    <span style="color: #38a169;">智能分析</span> → 
+                    <span style="color: #3182ce;">完整方案</span>
+                </div>
+                <h4 style="color: #38a169;">🎯 核心功能</h4>
                 <ul>
-                    <li>描述核心功能和特性</li>
-                    <li>说明目标用户群体</li>
-                    <li>提及技术偏好或限制</li>
-                    <li>描述主要使用场景</li>
-                    <li>可以包含商业模式想法</li>
+                    <li><span style="color: #e53e3e;">📋</span> 开发计划</li>
+                    <li><span style="color: #3182ce;">🤖</span> 编程提示词</li>
+                    <li><span style="color: #38a169;">📝</span> 直接可用</li>
                 </ul>
-                <h4 style="color: #38a169;">🎯 AI增强功能</h4>
+                <h4 style="color: #3182ce;">📖 使用提示</h4>
                 <ul>
-                    <li><span style="color: #e53e3e;">📋</span> 完整开发计划生成</li>
-                    <li><span style="color: #3182ce;">🤖</span> AI编程助手提示词</li>
-                    <li><span style="color: #38a169;">📝</span> 可直接用于编程工具</li>
-                    <li><span style="color: #805ad5;">🔗</span> 智能参考链接解析</li>
-                    <li><span style="color: #d69e2e;">🎨</span> 专业文档格式化</li>
-                </ul>
-                <h4 style="color: #3182ce;">📖 使用建议</h4>
-                <ul>
-                    <li><span style="color: #e53e3e;">✍️</span> 详细描述产品创意(10字以上)</li>
-                    <li><span style="color: #38a169;">🔗</span> 提供相关参考链接(可选)</li>
-                    <li><span style="color: #805ad5;">🎯</span> 明确目标用户和使用场景</li>
-                    <li><span style="color: #d69e2e;">⚡</span> 30秒即可获得完整方案</li>
+                    <li><span style="color: #e53e3e;">✍️</span> 详细描述创意</li>
+                    <li><span style="color: #38a169;">🔗</span> 可添加参考链接</li>
+                    <li><span style="color: #d69e2e;">⚡</span> 30秒获得方案</li>
                 </ul>
             </div>
             """)
@@ -2382,22 +2377,17 @@ with gr.Blocks(
             value="""
 <div style="text-align: center; padding: 2rem; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border-radius: 1rem; border: 2px dashed #cbd5e0;">
     <div style="font-size: 3rem; margin-bottom: 1rem;">🤖</div>
-    <h3 style="color: #2b6cb0; margin-bottom: 1rem; font-weight: bold;">AI开发计划生成器</h3>
+    <h3 style="color: #2b6cb0; margin-bottom: 1rem; font-weight: bold;">智能开发计划生成</h3>
     <p style="color: #4a5568; font-size: 1.1rem; margin-bottom: 1.5rem;">
-        💭 <strong style="color: #e53e3e;">输入您的产品创意，AI将生成完整的开发计划和编程提示词</strong>
+        💭 <strong style="color: #e53e3e;">输入创意，获得完整开发方案</strong>
     </p>
     <div style="background: linear-gradient(90deg, #edf2f7 0%, #e6fffa 100%); padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; border-left: 4px solid #38b2ac;">
         <p style="color: #2c7a7b; margin: 0; font-weight: 600;">
-            🎯 <strong style="color: #d69e2e;">包含：</strong><span style="color: #e53e3e;">技术方案</span> • <span style="color: #38a169;">开发计划</span> • <span style="color: #3182ce;">部署策略</span> • <span style="color: #805ad5;">AI编程提示词</span>
-        </p>
-    </div>
-    <div style="background: linear-gradient(45deg, #fed7d7 0%, #fbb6ce 100%); padding: 0.8rem; border-radius: 0.5rem; margin: 1rem 0;">
-        <p style="color: #c53030; margin: 0; font-weight: 600;">
-            ⚡ <strong>特色功能：</strong>MCP服务集成 • 个性化提示词 • 专业美化界面
+            🎯 <span style="color: #e53e3e;">技术方案</span> • <span style="color: #38a169;">开发计划</span> • <span style="color: #3182ce;">编程提示词</span>
         </p>
     </div>
     <p style="color: #a0aec0; font-size: 0.9rem;">
-        点击上方 <span style="color: #e53e3e; font-weight: bold;">"🤖 AI生成开发计划 + 编程提示词"</span> 按钮开始
+        点击 <span style="color: #e53e3e; font-weight: bold;">"🤖 AI生成开发计划"</span> 按钮开始
     </p>
 </div>
             """,
@@ -2439,42 +2429,37 @@ with gr.Blocks(
         # 使用提示
         gr.HTML("""
         <div style="padding: 10px; background: #e3f2fd; border-radius: 8px; text-align: center; color: #1565c0;" id="usage_tips">
-            💡 <strong style="color: #0d47a1;">使用提示</strong>: 点击上方按钮复制内容到剪贴板，或使用下方下载功能保存为文件。
+            💡 点击上方按钮复制内容，或下载保存为文件
         </div>
         """)
         
     # 示例区域
-    gr.Markdown("## 🎯 快速开始示例", elem_id="quick_start_container")
+    gr.Markdown("## 🎯 快速开始", elem_id="quick_start_container")
     gr.Examples(
         examples=[
-            # 单MCP服务示例 - 使用真实可访问的链接
             [
-                "我想开发一个智能投资助手，能够分析股票、基金数据，提供个性化投资建议和风险评估",
+                "智能投资助手：股票基金分析、个性化建议、风险评估",
                 "https://docs.python.org/3/library/sqlite3.html"
             ],
-            # 双MCP服务示例 - 使用真实GitHub项目
             [
-                "创建一个在线教育平台，支持视频直播、作业批改、学习进度跟踪和师生互动功能",
+                "在线教育平台：视频直播、作业批改、学习跟踪、师生互动",
                 "https://github.com/microsoft/vscode"
             ],
-            # 三MCP服务示例 - 使用真实文档链接
             [
-                "开发一个数字藏品交易平台，支持NFT铸造、拍卖、展示和社区交流功能",
+                "NFT交易平台：铸造、拍卖、展示、社区交流",
                 "https://ethereum.org/en/developers/docs/"
             ],
-            # 通用网页MCP示例 - 使用权威机构链接
             [
-                "构建一个智能健康管理系统，包含运动记录、饮食分析、健康报告和医生咨询功能",
+                "智能健康管理：运动记录、饮食分析、健康报告、医生咨询",
                 "https://www.who.int/health-topics/physical-activity"
             ],
-            # 不使用MCP的纯AI示例
             [
-                "设计一个家庭理财助手APP，支持记账、预算规划、投资建议和账单提醒功能",
+                "家庭理财助手APP：记账、预算规划、投资建议、账单提醒",
                 ""
             ]
         ],
         inputs=[idea_input, reference_url_input],
-        label="🎯 快速体验示例 - 展示不同MCP服务集成效果",
+        label="🎯 快速体验示例",
         examples_per_page=5,
         elem_id="enhanced_examples"
     )
@@ -2482,63 +2467,29 @@ with gr.Blocks(
     # 使用说明
     gr.HTML("""
     <div class="prompts-section" id="ai_helper_instructions">
-        <h3>🤖 AI编程助手使用说明</h3>
-        <p><strong>生成的编程提示词可以直接用于：</strong></p>
-        <ul>
-            <li>🔵 <strong>Claude Code</strong> - 专业的AI编程助手</li>
-            <li>🟢 <strong>GitHub Copilot</strong> - 代码自动补全工具</li>
-            <li>🟡 <strong>ChatGPT</strong> - 通用AI助手的编程模式</li>
-            <li>🔴 <strong>其他AI编程工具</strong> - 支持提示词输入的工具</li>
-        </ul>
-        <p><em>💡 建议：复制特定的编程提示词，然后粘贴到您选择的AI编程工具中，获得针对性的代码实现。</em></p>
+        <h3>🤖 编程提示词使用</h3>
+        <p><strong>支持主流AI编程工具：</strong></p>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0;">
+            <div style="text-align: center; padding: 10px; background: #f0f8ff; border-radius: 8px;">
+                <span style="font-size: 20px;">🔵</span><br>
+                <strong>Claude Code</strong>
+            </div>
+            <div style="text-align: center; padding: 10px; background: #f0fff4; border-radius: 8px;">
+                <span style="font-size: 20px;">🟢</span><br>
+                <strong>GitHub Copilot</strong>
+            </div>
+            <div style="text-align: center; padding: 10px; background: #fffaf0; border-radius: 8px;">
+                <span style="font-size: 20px;">🟡</span><br>
+                <strong>ChatGPT</strong>
+            </div>
+            <div style="text-align: center; padding: 10px; background: #fff0f5; border-radius: 8px;">
+                <span style="font-size: 20px;">🔴</span><br>
+                <strong>其他AI工具</strong>
+            </div>
+        </div>
+        <p style="text-align: center; color: #666;"><em>💡 复制提示词，粘贴到AI编程工具中获得代码实现</em></p>
     </div>
     """)
-    
-    # Agent应用展示部分
-    with gr.Accordion("🤖 Agent应用架构说明", open=False):
-        gr.Markdown("""
-### 🎯 **Agent应用特色**
-
-VibeDoc 是一个展示 **Agent应用** 能力的典型案例：
-
-**🔄 Agent工作流程：**
-1. **接收用户输入** - 处理产品创意和参考链接
-2. **智能路由决策** - 根据URL类型选择合适的MCP服务
-3. **多服务协作** - 调用DeepWiki、Fetch、Doubao等MCP服务
-4. **知识融合处理** - 将外部知识与AI推理结合
-5. **结构化输出** - 生成完整的开发计划和编程助手提示词
-
-**🤖 与传统应用的区别：**
-- ❌ **传统应用**: 固定的处理逻辑，单一的数据源
-- ✅ **Agent应用**: 智能决策路由，多服务协作，自适应工作流
-
-**🌟 技术亮点：**
-- 🧠 智能服务路由算法
-- 🔗 多MCP服务无缝集成  
-- 🛡️ 完善的容错降级机制
-- 📊 知识增强的AI生成
-        """)
-        
-        gr.Code(
-            value="""# Agent应用 vs MCP Server 的区别
-
-🤖 Agent应用 (我们的VibeDoc):
-├── 使用者: 调用多个MCP服务
-├── 职责: 智能决策和服务协作
-├── 特点: 自适应工作流，多源数据融合
-└── 价值: 提供完整的业务解决方案
-
-🔧 MCP Server:
-├── 提供者: 被Agent应用调用
-├── 职责: 提供特定功能服务
-├── 特点: 标准化接口，专业化能力
-└── 价值: 为Agent提供可复用的组件
-
-💡 VibeDoc展示了Agent如何智能地协调多个MCP服务，
-   实现比单个服务更强大的综合能力！""",
-            language="yaml",
-            label="Agent应用架构说明"
-        )
     
     # 绑定事件
     def show_download_info():
