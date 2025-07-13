@@ -609,7 +609,21 @@ def generate_development_plan_stream(user_idea: str, reference_url: str = ""):
                 )
                 
                 yield generator.emit_progress(100, detail="所有内容生成完成 🎉")
-                yield generator.next_stage()  # 发送FINAL消息
+                
+                # 🔥 发送最终结果消息，包含完整数据
+                yield generator.emit(StreamMessage(
+                    type=StreamMessageType.FINAL,
+                    stage=GenerationStage.FINALIZATION,
+                    step=6,
+                    title="🎉 生成完成",
+                    progress=100,
+                    timestamp=datetime.now().isoformat(),
+                    data={
+                        'completed': True,
+                        'final_result': (final_plan_text, prompts_section, temp_file),
+                        'elapsed_time': time.time() - generator.tracker.total_start_time
+                    }
+                ))
                 
                 return final_plan_text, prompts_section, temp_file
             else:
@@ -1254,34 +1268,16 @@ custom_css = """
     100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
 }
 
-/* 重构后的单栏居中创作画布 */
+/* 重构后的单栏居中创作画布 - 修复布局问题 */
 .main-creation-canvas {
-    max-width: 800px;
-    margin: 0 auto;
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
     padding: 2rem;
     background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
     border-radius: 2rem;
     box-shadow: 0 12px 40px rgba(59, 130, 246, 0.15);
     border: 1px solid #e2e8f0;
-}
-
-.content-card {
-    background: transparent;
-    padding: 0;
-    border-radius: 0;
-    box-shadow: none;
-    margin: 0;
-    border: none;
-}
-
-.dark .content-card {
-    background: transparent;
-    border-color: transparent;
-}
-
-.dark .main-creation-canvas {
-    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-    border-color: #374151;
 }
 
 .result-container {
@@ -1291,6 +1287,19 @@ custom_css = """
     margin: 2rem 0;
     border: 2px solid #3b82f6;
     box-shadow: 0 10px 30px rgba(59, 130, 246, 0.15);
+    width: 100% !important;
+}
+
+/* 确保Gradio容器占满宽度 */
+.gradio-container {
+    max-width: none !important;
+    margin: 0 auto !important;
+}
+
+/* 修复可能的分栏问题 */
+.gr-column {
+    width: 100% !important;
+    flex: none !important;
 }
 
 .dark .result-container {
@@ -2909,353 +2918,54 @@ with gr.Blocks(
             return fixedCode;
         }
         
-        // 流式数据处理器 - 处理AI工作实况
-        class StreamProcessor {
-            constructor() {
-                this.tracker = null;
-                this.thoughtLog = null;
-                this.isActive = false;
-                this.thoughtCount = 0;
-            }
-            
-            initialize() {
-                this.tracker = document.getElementById('generation-status-tracker');
-                this.thoughtLog = document.getElementById('thought-log');
-                console.log('🔥 StreamProcessor initialized');
-            }
-            
-            startStreaming() {
-                if (!this.tracker) this.initialize();
-                
-                this.isActive = true;
-                this.thoughtCount = 0;
-                
-                // 显示进度跟踪器
-                if (this.tracker) {
-                    this.tracker.style.display = 'block';
-                }
-                
-                // 重置所有步骤状态
-                this.resetAllSteps();
-                
-                // 添加开始日志
-                this.addThoughtEntry('开始AI生成流程...', 'action');
-                
-                console.log('🚀 Stream started');
-            }
-            
-            processMessage(data) {
-                if (!this.isActive) return;
-                
-                try {
-                    console.log('📨 Processing stream message:', data);
-                    
-                    const message = typeof data === 'string' ? JSON.parse(data) : data;
-                    
-                    switch (message.type) {
-                        case 'progress':
-                            this.updateProgress(message);
-                            break;
-                        case 'thought':
-                            this.addThought(message);
-                            break;
-                        case 'action':
-                            this.addAction(message);
-                            break;
-                        case 'content':
-                            this.addContent(message);
-                            break;
-                        case 'complete':
-                            this.completeStep(message);
-                            break;
-                        case 'error':
-                            this.showError(message);
-                            break;
-                        case 'final':
-                            this.finishStreaming(message);
-                            break;
-                    }
-                } catch (error) {
-                    console.error('❌ Stream processing error:', error);
-                }
-            }
-            
-            updateProgress(message) {
-                // 更新整体进度条
-                const progressBar = document.getElementById('overall-progress-bar');
-                const progressText = document.querySelector('.progress-percentage');
-                const etaElement = document.getElementById('eta-time');
-                
-                if (progressBar) {
-                    progressBar.style.width = `${message.progress}%`;
-                }
-                
-                if (progressText) {
-                    progressText.textContent = `${Math.round(message.progress)}%`;
-                }
-                
-                // 更新预计完成时间
-                if (etaElement && message.data.estimated_remaining) {
-                    const minutes = Math.floor(message.data.estimated_remaining / 60);
-                    const seconds = message.data.estimated_remaining % 60;
-                    etaElement.textContent = minutes > 0 ? 
-                        `${minutes}分${seconds}秒` : 
-                        `${seconds}秒`;
-                }
-                
-                // 更新步骤状态
-                this.updateStepStatus(message.step, 'active', message.title);
-                
-                // 更新当前活动
-                this.updateCurrentActivity(message.title, message.data.detail || '');
-            }
-            
-            updateStepStatus(step, status, title) {
-                const stepElement = document.querySelector(`[data-step="${step}"]`);
-                if (!stepElement) return;
-                
-                // 清除之前的状态
-                stepElement.classList.remove('waiting', 'active', 'completed', 'error');
-                
-                // 添加新状态
-                stepElement.classList.add(status);
-                
-                // 更新状态文本
-                const statusElement = stepElement.querySelector('.step-status');
-                if (statusElement) {
-                    switch (status) {
-                        case 'active':
-                            statusElement.textContent = '进行中...';
-                            break;
-                        case 'completed':
-                            statusElement.textContent = '已完成';
-                            break;
-                        case 'error':
-                            statusElement.textContent = '出错了';
-                            break;
-                        default:
-                            statusElement.textContent = '等待中';
-                    }
-                }
-            }
-            
-            addThought(message) {
-                this.addThoughtEntry(message.data.thought, 'thought');
-            }
-            
-            addAction(message) {
-                this.addThoughtEntry(`🔧 ${message.data.action}`, 'action');
-                this.updateCurrentActivity('执行中', message.data.action);
-            }
-            
-            addContent(message) {
-                this.addThoughtEntry(`📄 生成了${message.data.section}内容`, 'action');
-                
-                // 这里可以添加渐进式内容渲染
-                // TODO: 实现渐进式内容显示
-            }
-            
-            completeStep(message) {
-                this.updateStepStatus(message.step, 'completed', message.title);
-                this.addThoughtEntry(`✅ ${message.title} 完成`, 'action');
-            }
-            
-            showError(message) {
-                this.updateStepStatus(message.step, 'error', message.title);
-                this.addThoughtEntry(`❌ 错误: ${message.data.error}`, 'error');
-                this.updateCurrentActivity('出现错误', message.data.error);
-            }
-            
-            finishStreaming(message) {
-                this.isActive = false;
-                
-                // 标记所有步骤为完成
-                for (let i = 1; i <= 6; i++) {
-                    this.updateStepStatus(i, 'completed', '');
-                }
-                
-                // 更新进度条到100%
-                const progressBar = document.getElementById('overall-progress-bar');
-                const progressText = document.querySelector('.progress-percentage');
-                
-                if (progressBar) progressBar.style.width = '100%';
-                if (progressText) progressText.textContent = '100%';
-                
-                this.updateCurrentActivity('🎉 生成完成', '您的开发方案已经准备就绪！');
-                this.addThoughtEntry('🎉 所有内容生成完成！', 'action');
-                
-                console.log('✅ Stream finished');
-            }
-            
-            resetAllSteps() {
-                for (let i = 1; i <= 6; i++) {
-                    this.updateStepStatus(i, 'waiting', '');
-                }
-                
-                // 重置进度条
-                const progressBar = document.getElementById('overall-progress-bar');
-                const progressText = document.querySelector('.progress-percentage');
-                
-                if (progressBar) progressBar.style.width = '0%';
-                if (progressText) progressText.textContent = '0%';
-            }
-            
-            updateCurrentActivity(title, detail) {
-                const activityElement = document.getElementById('current-activity-text');
-                if (activityElement) {
-                    activityElement.innerHTML = `
-                        <strong>${title}</strong>
-                        ${detail ? `<br><span style="opacity: 0.8;">${detail}</span>` : ''}
-                    `;
-                }
-            }
-            
-            addThoughtEntry(text, type = 'thought') {
-                if (!this.thoughtLog) return;
-                
-                this.thoughtCount++;
-                const now = new Date();
-                const timeStr = now.toLocaleTimeString('zh-CN', { 
-                    hour12: false, 
-                    hour: '2-digit', 
-                    minute: '2-digit', 
-                    second: '2-digit' 
-                });
-                
-                const entry = document.createElement('div');
-                entry.className = `thought-entry ${type}`;
-                entry.innerHTML = `
-                    <span class="thought-time">${timeStr}</span>
-                    <span class="thought-text">${text}</span>
-                `;
-                
-                this.thoughtLog.appendChild(entry);
-                
-                // 自动滚动到最新条目
-                this.thoughtLog.scrollTop = this.thoughtLog.scrollHeight;
-                
-                // 限制条目数量（保持性能）
-                const entries = this.thoughtLog.querySelectorAll('.thought-entry');
-                if (entries.length > 100) {
-                    entries[0].remove();
-                }
-            }
-        }
-        
-        // 初始化流式处理器
-        const streamProcessor = new StreamProcessor();
-        
-        // 清空思考日志函数
-        function clearThoughtLog() {
-            const thoughtLog = document.getElementById('thought-log');
-            if (thoughtLog) {
-                thoughtLog.innerHTML = `
-                    <div class="thought-entry initial">
-                        <span class="thought-time">就绪</span>
-                        <span class="thought-text">等待您的创意输入...</span>
+        // 极简进度显示系统 - 修复复杂流式系统问题
+        function showBasicProgress() {
+            const planResult = document.getElementById('plan_result');
+            if (planResult) {
+                planResult.innerHTML = `
+                    <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 1rem; padding: 2rem; text-align: center; border: 2px solid #0ea5e9; margin: 1rem 0;">
+                        <div style="font-size: 2rem; margin-bottom: 1rem;">🚀</div>
+                        <h3 style="color: #1d4ed8; margin-bottom: 1rem;">AI正在生成您的专业方案</h3>
+                        <div id="basic-spinner" style="margin: 1.5rem auto; width: 32px; height: 32px; border: 3px solid #e5e7eb; border-top: 3px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <p style="color: #6b7280; margin: 0.5rem 0;">预计需要30-100秒，请耐心等待</p>
+                        <p style="color: #9ca3af; font-size: 0.9rem;">💡 AI正在深度分析您的创意，生成完整方案</p>
                     </div>
                 `;
             }
         }
         
-        // Gradio流式数据处理集成
-        function setupGradioStreamingIntegration() {
-            // 监听Gradio的stream_data组件变化
-            const streamReceiver = document.getElementById('stream-receiver');
-            if (streamReceiver) {
-                const observer = new MutationObserver((mutations) => {
-                    mutations.forEach((mutation) => {
-                        if (mutation.type === 'childList' || mutation.type === 'subtree') {
-                            try {
-                                const textContent = streamReceiver.textContent || streamReceiver.innerText;
-                                if (textContent && textContent.trim()) {
-                                    const data = JSON.parse(textContent);
-                                    if (data && typeof data === 'object') {
-                                        console.log('📨 Received stream data:', data);
-                                        streamProcessor.processMessage(data);
-                                    }
-                                }
-                            } catch (error) {
-                                console.error('❌ Error processing stream data:', error);
-                            }
-                        }
-                    });
-                });
-                
-                observer.observe(streamReceiver, {
-                    childList: true,
-                    subtree: true,
-                    characterData: true
-                });
-                
-                console.log('✅ Gradio streaming integration initialized');
-            }
-            
-            // 监听stream_status变化来启动/停止流式处理
-            const streamStatus = document.getElementById('stream-status');
-            if (streamStatus) {
-                const statusObserver = new MutationObserver((mutations) => {
-                    mutations.forEach((mutation) => {
-                        const status = streamStatus.textContent || streamStatus.innerText;
-                        if (status === 'streaming' && !streamProcessor.isActive) {
-                            console.log('🚀 Starting streaming session');
-                            streamProcessor.startStreaming();
-                        } else if (status === 'completed' && streamProcessor.isActive) {
-                            console.log('🎉 Streaming session completed');
-                            streamProcessor.finishStreaming();
-                        }
-                    });
-                });
-                
-                statusObserver.observe(streamStatus, {
-                    childList: true,
-                    characterData: true
+        // 监听生成按钮 - 简化版本
+        function bindBasicProgress() {
+            const generateBtn = document.querySelector('.generate-btn');
+            if (generateBtn) {
+                generateBtn.addEventListener('click', function() {
+                    setTimeout(showBasicProgress, 50);
                 });
             }
         }
         
-        // 模拟流式数据（用于测试）
-        function simulateStreamingData() {
-            streamProcessor.startStreaming();
+        // 结果监听 - 简化版
+        function observeBasicResults() {
+            const planResult = document.getElementById('plan_result');
+            if (!planResult) return;
             
-            // 模拟步骤1
-            setTimeout(() => {
-                streamProcessor.processMessage({
-                    type: 'progress',
-                    stage: 'validation',
-                    step: 1,
-                    title: '🔍 创意验证',
-                    progress: 5,
-                    data: { detail: '正在解析创意描述' }
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'childList') {
+                        const hasContent = planResult.textContent.includes('开发计划') || 
+                                         planResult.textContent.includes('技术方案') ||
+                                         planResult.textContent.includes('❌') ||
+                                         planResult.textContent.includes('生成完成');
+                        
+                        // 如果有实际内容显示，说明生成完成
+                        if (hasContent && !planResult.textContent.includes('AI正在生成')) {
+                            console.log('✅ 检测到生成完成');
+                        }
+                    }
                 });
-            }, 500);
+            });
             
-            setTimeout(() => {
-                streamProcessor.processMessage({
-                    type: 'thought',
-                    data: { thought: '开始分析您的产品创意，这是一个激动人心的想法！' }
-                });
-            }, 1000);
-            
-            setTimeout(() => {
-                streamProcessor.processMessage({
-                    type: 'action',
-                    data: { action: '验证API配置和服务状态' }
-                });
-            }, 1500);
-            
-            setTimeout(() => {
-                streamProcessor.processMessage({
-                    type: 'progress',
-                    stage: 'validation',
-                    step: 1,
-                    title: '🔍 创意验证',
-                    progress: 10,
-                    data: { detail: '创意验证完成 ✅' }
-                });
-            }, 2000);
-            
-            // 可以继续添加更多模拟步骤...
+            observer.observe(planResult, { childList: true, subtree: true });
         }
         
         // 增强的Mermaid图表渲染系统
@@ -3464,152 +3174,7 @@ with gr.Blocks(
             }
         }
         
-        // 智能进度管理系统
-        let progressSteps = [
-            { id: 'analyzing', icon: '🧠', text: '创意分析', duration: 5 },
-            { id: 'researching', icon: '🔍', text: '知识收集', duration: 8 },
-            { id: 'planning', icon: '📋', text: '方案生成', duration: 12 },
-            { id: 'formatting', icon: '✨', text: '美化输出', duration: 5 }
-        ];
-        
-        let currentStep = 0;
-        let progressTimer = null;
-        let startTime = null;
-        
-        function showProgressDisplay() {
-            const resultContainer = document.getElementById('plan_result');
-            if (!resultContainer) return;
-            
-            startTime = Date.now();
-            currentStep = 0;
-            
-            const progressHTML = `
-                <div class="progress-container">
-                    <h3 style="color: #1d4ed8; margin-bottom: 1rem; font-size: 1.3rem;">🚀 AI正在为您创造奇迹</h3>
-                    <div class="progress-spinner"></div>
-                    <div class="progress-steps">
-                        ${progressSteps.map((step, index) => `
-                            <div class="progress-step" id="step-${step.id}">
-                                <span class="step-icon">${step.icon}</span>
-                                <div class="step-text">${step.text}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                    <div class="progress-time" id="progress-time">预计还需 30 秒...</div>
-                    <p style="color: #6b7280; margin-top: 1rem; font-size: 0.9rem;">
-                        💡 AI正在深度分析您的创意，整合最佳实践，生成专业方案
-                    </p>
-                </div>
-            `;
-            
-            resultContainer.innerHTML = progressHTML;
-            startProgressAnimation();
-        }
-        
-        function startProgressAnimation() {
-            if (progressTimer) clearInterval(progressTimer);
-            
-            // 立即激活第一步
-            updateProgressStep(0);
-            
-            let stepStartTime = Date.now();
-            progressTimer = setInterval(() => {
-                const elapsed = (Date.now() - startTime) / 1000;
-                const currentStepElapsed = (Date.now() - stepStartTime) / 1000;
-                
-                // 更新时间显示
-                const remaining = Math.max(0, 30 - elapsed);
-                const timeElement = document.getElementById('progress-time');
-                if (timeElement) {
-                    if (remaining > 0) {
-                        timeElement.textContent = `预计还需 ${Math.ceil(remaining)} 秒...`;
-                    } else {
-                        timeElement.textContent = `正在完成最后的优化...`;
-                    }
-                }
-                
-                // 检查是否需要进入下一步
-                if (currentStep < progressSteps.length - 1 && 
-                    currentStepElapsed >= progressSteps[currentStep].duration) {
-                    currentStep++;
-                    updateProgressStep(currentStep);
-                    stepStartTime = Date.now();
-                }
-                
-                // 如果超过35秒还没完成，显示延迟提示
-                if (elapsed > 35) {
-                    const timeElement = document.getElementById('progress-time');
-                    if (timeElement) {
-                        timeElement.innerHTML = `
-                            <span style="color: #f59e0b;">⏳ 正在处理复杂内容，请稍候...</span><br>
-                            <span style="font-size: 0.8rem; color: #9ca3af;">复杂创意需要更多时间来生成高质量方案</span>
-                        `;
-                    }
-                }
-            }, 1000);
-        }
-        
-        function updateProgressStep(stepIndex) {
-            // 标记当前步骤为活跃
-            const currentStepElement = document.getElementById(`step-${progressSteps[stepIndex].id}`);
-            if (currentStepElement) {
-                currentStepElement.classList.add('active');
-            }
-            
-            // 标记之前的步骤为完成
-            for (let i = 0; i < stepIndex; i++) {
-                const stepElement = document.getElementById(`step-${progressSteps[i].id}`);
-                if (stepElement) {
-                    stepElement.classList.remove('active');
-                    stepElement.classList.add('completed');
-                }
-            }
-        }
-        
-        function hideProgressDisplay() {
-            if (progressTimer) {
-                clearInterval(progressTimer);
-                progressTimer = null;
-            }
-            currentStep = 0;
-        }
-        
-        // 为生成按钮绑定进度显示
-        function bindProgressToButton() {
-            const generateBtn = document.querySelector('.generate-btn');
-            if (generateBtn) {
-                generateBtn.addEventListener('click', function() {
-                    // 延迟显示进度，让Gradio有时间处理
-                    setTimeout(showProgressDisplay, 100);
-                });
-            }
-        }
-        
-        // 监听结果区域变化，自动隐藏进度
-        function observeResultChanges() {
-            const resultContainer = document.getElementById('plan_result');
-            if (!resultContainer) return;
-            
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.type === 'childList') {
-                        // 检查是否显示了实际结果（而不是进度）
-                        const hasProgress = resultContainer.querySelector('.progress-container');
-                        const hasResult = resultContainer.textContent.includes('开发计划') || 
-                                        resultContainer.textContent.includes('技术方案') ||
-                                        resultContainer.textContent.includes('❌');
-                        
-                        if (!hasProgress && hasResult) {
-                            hideProgressDisplay();
-                        }
-                    }
-                });
-            });
-            
-            observer.observe(resultContainer, { childList: true, subtree: true });
-        }
-        
-        // 绑定复制按钮事件
+        // 绑定复制按钮事件 - 简化版
         function bindCopyButtons() {
             document.querySelectorAll('.individual-copy-btn').forEach(button => {
                 button.addEventListener('click', function() {
@@ -3620,15 +3185,14 @@ with gr.Blocks(
             });
         }
         
-        // 页面加载完成后初始化
+        // 页面加载完成后初始化 - 简化版
         document.addEventListener('DOMContentLoaded', function() {
             updateMermaidTheme();
             bindCopyButtons();
-            bindProgressToButton();
-            observeResultChanges();
+            bindBasicProgress(); // 使用简化的进度绑定
+            observeBasicResults(); // 使用简化的结果监听
             
-            // 🔥 初始化Gradio流式集成
-            setupGradioStreamingIntegration();
+            console.log('✅ 页面初始化完成 - 简化模式');
             
             // 监听主题切换
             const observer = new MutationObserver(function(mutations) {
@@ -3668,183 +3232,42 @@ with gr.Blocks(
     </script>
     """)
     
-    # 主创作区域和流式进度跟踪器布局
-    with gr.Row():
-        # 左侧：主创作区域 (60%宽度)
-        with gr.Column(scale=3, elem_classes="main-creation-canvas"):
-            gr.Markdown("## 💡 将您的创意转化为现实", elem_id="input_idea_title")
-            
-            idea_input = gr.Textbox(
-                label="产品创意描述",
-                placeholder="🎯 详细描述您的产品创意...\n\n💡 例如：一个智能代码片段管理工具，帮助开发者收集、分类和快速检索常用代码片段。支持多语言语法高亮、标签分类、团队共享功能，并能与主流IDE集成，提高开发效率...\n\n✨ 提示：描述越详细，AI生成的方案越精准！",
-                lines=6,
-                max_lines=12,
-                show_label=False
-            )
-            
-            reference_url_input = gr.Textbox(
-                label="参考链接 (可选)",
-                placeholder="🔗 粘贴相关网页链接获取更精准的方案（支持GitHub、博客、新闻、文档等）",
-                lines=1,
-                show_label=True
-            )
-            
-            with gr.Row():
-                generate_btn = gr.Button(
-                    "🚀 开始创造 - AI生成完整开发方案",
-                    variant="primary",
-                    size="lg",
-                    elem_classes="generate-btn",
-                    scale=2
-                )
-                
-                # 🔥 测试流式效果按钮 (开发调试用)
-                if config.debug:
-                    test_stream_btn = gr.Button(
-                        "🧪 测试流式效果",
-                        variant="secondary",
-                        size="sm",
-                        elem_classes="copy-btn",
-                        scale=1
-                    )
-            
-            # 简化的快速提示（悬浮显示）
-            gr.HTML("""
-            <div style="text-align: center; margin-top: 0.5rem;">
-                <span style="color: #64748b; font-size: 0.9rem; font-style: italic;">
-                    💡 30秒获得专业方案
-                </span>
-            </div>
-            """)
+    # 主创作区域 - 恢复单栏布局
+    with gr.Column(elem_classes="main-creation-canvas"):
+        gr.Markdown("## 💡 将您的创意转化为现实", elem_id="input_idea_title")
         
-        # 右侧：实时进度跟踪器 (40%宽度)
-        with gr.Column(scale=2, elem_classes="streaming-tracker-container"):
-            # 🔥 实时进度跟踪器
-            gr.HTML("""
-            <div id="generation-status-tracker" class="tracker-container" style="display: none;">
-                <h3 class="tracker-title">🔥 AI工作实况</h3>
-                
-                <!-- 整体进度条 -->
-                <div class="overall-progress">
-                    <div class="progress-header">
-                        <span class="progress-text">整体进度</span>
-                        <span class="progress-percentage">0%</span>
-                    </div>
-                    <div class="progress-bar-container">
-                        <div class="progress-bar" id="overall-progress-bar"></div>
-                    </div>
-                    <div class="progress-eta">
-                        预计完成：<span id="eta-time">计算中...</span>
-                    </div>
-                </div>
-                
-                <!-- 6步骤清单 -->
-                <div class="steps-checklist">
-                    <div class="step-item" data-step="1" data-stage="validation">
-                        <div class="step-icon">🔍</div>
-                        <div class="step-content">
-                            <div class="step-title">创意验证</div>
-                            <div class="step-description">解析并验证用户输入的创意</div>
-                            <div class="step-status">等待中</div>
-                        </div>
-                        <div class="step-progress-mini"></div>
-                    </div>
-                    
-                    <div class="step-item" data-step="2" data-stage="knowledge">
-                        <div class="step-icon">📚</div>
-                        <div class="step-content">
-                            <div class="step-title">知识收集</div>
-                            <div class="step-description">调用MCP服务获取外部参考资料</div>
-                            <div class="step-status">等待中</div>
-                        </div>
-                        <div class="step-progress-mini"></div>
-                    </div>
-                    
-                    <div class="step-item" data-step="3" data-stage="analysis">
-                        <div class="step-icon">🧠</div>
-                        <div class="step-content">
-                            <div class="step-title">智能分析</div>
-                            <div class="step-description">AI深度分析创意可行性和技术方案</div>
-                            <div class="step-status">等待中</div>
-                        </div>
-                        <div class="step-progress-mini"></div>
-                    </div>
-                    
-                    <div class="step-item" data-step="4" data-stage="generation">
-                        <div class="step-icon">⚡</div>
-                        <div class="step-content">
-                            <div class="step-title">方案生成</div>
-                            <div class="step-description">生成完整的开发计划和架构设计</div>
-                            <div class="step-status">等待中</div>
-                        </div>
-                        <div class="step-progress-mini"></div>
-                    </div>
-                    
-                    <div class="step-item" data-step="5" data-stage="formatting">
-                        <div class="step-icon">✨</div>
-                        <div class="step-content">
-                            <div class="step-title">内容美化</div>
-                            <div class="step-description">格式化内容并生成图表</div>
-                            <div class="step-status">等待中</div>
-                        </div>
-                        <div class="step-progress-mini"></div>
-                    </div>
-                    
-                    <div class="step-item" data-step="6" data-stage="finalization">
-                        <div class="step-icon">🎯</div>
-                        <div class="step-content">
-                            <div class="step-title">最终输出</div>
-                            <div class="step-description">创建文件并提取AI编程提示词</div>
-                            <div class="step-status">等待中</div>
-                        </div>
-                        <div class="step-progress-mini"></div>
-                    </div>
-                </div>
-                
-                <!-- 当前活动显示 -->
-                <div class="current-activity">
-                    <div class="activity-header">
-                        <span class="activity-icon">🤖</span>
-                        <span class="activity-title">当前状态</span>
-                    </div>
-                    <div class="activity-content" id="current-activity-text">
-                        准备开始...
-                    </div>
-                </div>
-            </div>
-            """, elem_id="tracker-html")
-            
-            # 🧠 AI思考过程窗口 (可折叠)
-            with gr.Accordion("🧠 AI实时思考日志", open=False, elem_id="thought-viewer"):
-                gr.HTML("""
-                <div id="thought-log-container" class="thought-container">
-                    <div class="thought-header">
-                        <span class="thought-icon">💭</span>
-                        <span class="thought-title">AI思考过程</span>
-                        <button class="clear-log-btn" onclick="clearThoughtLog()">清空</button>
-                    </div>
-                    <div class="thought-log" id="thought-log">
-                        <div class="thought-entry initial">
-                            <span class="thought-time">就绪</span>
-                            <span class="thought-text">等待您的创意输入...</span>
-                        </div>
-                    </div>
-                </div>
-                """, elem_id="thought-html")
-            
-            # 🔥 流式数据接收器 (隐藏组件) - 核心数据传输通道
-            stream_data = gr.JSON(
-                value={}, 
-                visible=False, 
-                elem_id="stream-receiver",
-                show_label=False
+        idea_input = gr.Textbox(
+            label="产品创意描述",
+            placeholder="🎯 详细描述您的产品创意...\n\n💡 例如：一个智能代码片段管理工具，帮助开发者收集、分类和快速检索常用代码片段。支持多语言语法高亮、标签分类、团队共享功能，并能与主流IDE集成，提高开发效率...\n\n✨ 提示：描述越详细，AI生成的方案越精准！",
+            lines=6,
+            max_lines=12,
+            show_label=False
+        )
+        
+        reference_url_input = gr.Textbox(
+            label="参考链接 (可选)",
+            placeholder="🔗 粘贴相关网页链接获取更精准的方案（支持GitHub、博客、新闻、文档等）",
+            lines=1,
+            show_label=True
+        )
+        
+        with gr.Row():
+            generate_btn = gr.Button(
+                "🚀 开始创造 - AI生成完整开发方案",
+                variant="primary",
+                size="lg",
+                elem_classes="generate-btn",
+                scale=2
             )
-            stream_status = gr.Textbox(
-                value="", 
-                visible=False, 
-                elem_id="stream-status",
-                show_label=False
-            )
+        
+        # 快速提示（简化版）
+        gr.HTML("""
+        <div style="text-align: center; margin: 1rem 0;">
+            <span style="color: #64748b; font-size: 0.9rem; font-style: italic;">
+                💡 30-100秒获得专业方案 | 🔄 支持实时进度显示 | ✨ 一键下载完整文档
+            </span>
+        </div>
+        """)
     
     # 结果显示区域
     with gr.Column(elem_classes="result-container"):
@@ -4035,73 +3458,80 @@ with gr.Blocks(
             visible=True
         )
     
-    # 流式生成处理函数
-    def process_streaming_generation(user_idea: str, reference_url: str):
-        """处理流式生成并返回结果"""
-        final_result = None
-        stream_messages = []
-        
+    # 简化的生成处理函数 - 增强错误处理
+    def simple_generate_plan(user_idea: str, reference_url: str):
+        """简化的计划生成函数 - 移除复杂流式处理"""
         try:
-            # 调用流式生成器
-            for message in generate_development_plan_stream(user_idea, reference_url):
-                stream_messages.append(message)
-                
-                # 处理不同类型的消息
-                if hasattr(message, 'to_json'):
-                    stream_json = message.to_json()
-                elif isinstance(message, dict):
-                    stream_json = json.dumps(message, ensure_ascii=False)
-                else:
-                    # 如果是StreamMessage对象，手动序列化
-                    stream_json = json.dumps({
-                        "type": message.type.value if hasattr(message.type, 'value') else str(message.type),
-                        "stage": message.stage.value if hasattr(message.stage, 'value') else str(message.stage),
-                        "step": message.step,
-                        "title": message.title,
-                        "progress": message.progress,
-                        "timestamp": message.timestamp,
-                        "data": message.data
-                    }, ensure_ascii=False)
-                
-                # 推送流式数据到前端
-                yield (
-                    gr.update(),  # plan_output不变
-                    gr.update(),  # prompts_for_copy不变  
-                    gr.update(),  # download_file不变
-                    stream_json,  # stream_data
-                    "streaming"   # stream_status
-                )
+            logger.info("🚀 开始简化模式生成")
+            start_time = time.time()
             
-            # 流式完成后，调用原函数获取最终结果
-            final_plan, final_prompts, final_file = generate_development_plan(user_idea, reference_url)
+            # 验证API配置
+            if not API_KEY:
+                error_msg = """
+## ❌ 配置错误：未设置API密钥
+
+### 🔧 解决方法：
+1. **获取API密钥**：访问 [Silicon Flow](https://siliconflow.cn) 注册并获取API密钥
+2. **配置环境变量**：`export SILICONFLOW_API_KEY=your_api_key_here`
+3. **重启应用**：配置完成后重启应用即可使用
+
+💡 提示：这是正常的配置步骤，配置完成后即可生成专业开发方案。
+"""
+                return error_msg, "", ""
             
-            yield (
-                final_plan,    # plan_output
-                final_prompts, # prompts_for_copy
-                final_file,    # download_file  
-                json.dumps({"type": "complete", "message": "生成完成"}, ensure_ascii=False),  # stream_data
-                "completed"    # stream_status
-            )
+            # 直接调用核心生成函数
+            plan_text, prompts_text, temp_file = generate_development_plan(user_idea, reference_url)
+            
+            elapsed_time = time.time() - start_time
+            logger.info(f"✅ 生成完成，耗时: {elapsed_time:.1f}秒")
+            
+            # 确保生成结果有效
+            if not plan_text or plan_text.startswith("❌"):
+                return plan_text, prompts_text, temp_file
+            
+            # 在生成结果前添加性能信息
+            performance_info = f"""
+<div style="background: #e8f5e8; border-radius: 8px; padding: 1rem; margin: 1rem 0; text-align: center;">
+    ✅ <strong>生成完成！</strong> 耗时: {elapsed_time:.1f}秒 | 
+    🤖 使用模型: Qwen2.5-72B-Instruct | 
+    🔗 MCP服务: {len([s for s in config.get_enabled_mcp_services()])}个已启用
+</div>
+
+---
+
+{plan_text}
+"""
+            
+            return performance_info, prompts_text, temp_file
             
         except Exception as e:
-            logger.error(f"流式生成错误: {str(e)}")
-            # 如果流式生成失败，回退到普通生成
-            final_plan, final_prompts, final_file = generate_development_plan(user_idea, reference_url)
+            elapsed_time = time.time() - start_time if 'start_time' in locals() else 0
+            logger.error(f"❌ 生成失败 ({elapsed_time:.1f}秒): {str(e)}")
             
-            yield (
-                final_plan,    # plan_output
-                final_prompts, # prompts_for_copy
-                final_file,    # download_file  
-                json.dumps({"type": "error", "message": f"流式生成失败，已回退到常规模式: {str(e)}"}, ensure_ascii=False),
-                "error"        # stream_status
-            )
+            error_response = f"""
+## ❌ 生成过程出现错误
+
+**错误信息**: {str(e)}
+
+**调试信息**:
+- 生成时间: {elapsed_time:.1f}秒
+- 当前时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+### 🔧 可能的解决方案：
+1. 检查网络连接
+2. 确认API密钥配置正确
+3. 稍后重试
+
+如果问题持续存在，请联系技术支持。
+"""
+            return error_response, "", ""
     
-    # 绑定流式生成事件
+    # 绑定事件 - 简化版本
     generate_btn.click(
-        fn=process_streaming_generation,
+        fn=simple_generate_plan,
         inputs=[idea_input, reference_url_input],
-        outputs=[plan_output, prompts_for_copy, download_file, stream_data, stream_status],
-        api_name="generate_plan_stream"
+        outputs=[plan_output, prompts_for_copy, download_file],
+        api_name="generate_plan"
     ).then(
         fn=lambda: gr.update(visible=True),
         outputs=[download_file]
@@ -4109,74 +3539,6 @@ with gr.Blocks(
         fn=show_download_info,
         outputs=[download_info]
     )
-    
-    # 🧪 测试流式效果按钮事件 (仅在debug模式下显示)
-    if config.debug:
-        def test_streaming_effect():
-            """测试流式效果的模拟数据"""
-            test_messages = [
-                {
-                    "type": "progress",
-                    "stage": "validation", 
-                    "step": 1,
-                    "title": "🔍 创意验证",
-                    "progress": 5,
-                    "timestamp": datetime.now().isoformat(),
-                    "data": {"detail": "正在解析创意描述"}
-                },
-                {
-                    "type": "thought",
-                    "stage": "validation",
-                    "step": 0,
-                    "title": "AI思考中...",
-                    "progress": 0,
-                    "timestamp": datetime.now().isoformat(),
-                    "data": {"thought": "开始分析您的产品创意，这是一个激动人心的想法！"}
-                },
-                {
-                    "type": "action", 
-                    "stage": "validation",
-                    "step": 0,
-                    "title": "执行中...",
-                    "progress": 0,
-                    "timestamp": datetime.now().isoformat(),
-                    "data": {"action": "验证API配置和服务状态"}
-                },
-                {
-                    "type": "progress",
-                    "stage": "validation",
-                    "step": 1, 
-                    "title": "🔍 创意验证",
-                    "progress": 10,
-                    "timestamp": datetime.now().isoformat(),
-                    "data": {"detail": "创意验证完成 ✅"}
-                }
-            ]
-            
-            for msg in test_messages:
-                yield (
-                    gr.update(),  # plan_output
-                    gr.update(),  # prompts_for_copy
-                    gr.update(),  # download_file
-                    json.dumps(msg, ensure_ascii=False),  # stream_data
-                    "streaming"   # stream_status
-                )
-                time.sleep(1)  # 模拟延迟
-            
-            # 完成测试
-            yield (
-                gr.update(value="## 🧪 流式测试完成\n\n测试消息已成功发送到前端进度跟踪器！"),
-                gr.update(), 
-                gr.update(),
-                json.dumps({"type": "complete", "message": "测试完成"}, ensure_ascii=False),
-                "completed"
-            )
-        
-        test_stream_btn.click(
-            fn=test_streaming_effect,
-            inputs=[],
-            outputs=[plan_output, prompts_for_copy, download_file, stream_data, stream_status]
-        )
     
     # 复制按钮事件（使用JavaScript实现）
     copy_plan_btn.click(
