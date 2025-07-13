@@ -463,7 +463,7 @@ gantt
     title 项目开发甘特图
     dateFormat YYYY-MM-DD
     section 需求分析
-    需求分析     :a1, 2024-01-01, 7d
+    需求分析     :a1, 2025-01-01, 7d
     section 系统设计
     系统设计     :a2, after a1, 14d
     section 开发实施
@@ -841,9 +841,20 @@ def enhance_markdown_structure(content: str) -> str:
             
         # 增强阶段标题
         if '阶段' in stripped and '：' in stripped:
-            phase_num = stripped.split('第')[1].split('阶段')[0] if '第' in stripped else ''
-            phase_name = stripped.split('：')[1] if '：' in stripped else stripped
-            enhanced_lines.append(f"\n#### 🚀 第{phase_num}阶段：{phase_name}\n")
+            if '第' in stripped and '阶段' in stripped:
+                try:
+                    # 更健壮的阶段号提取逻辑
+                    parts = stripped.split('第')
+                    if len(parts) > 1:
+                        phase_part = parts[1].split('阶段')[0].strip()
+                        phase_name = stripped.split('：')[1].strip() if '：' in stripped else ''
+                        enhanced_lines.append(f"\n#### 🚀 第{phase_part}阶段：{phase_name}\n")
+                    else:
+                        enhanced_lines.append(f"\n#### 🚀 {stripped}\n")
+                except:
+                    enhanced_lines.append(f"\n#### 🚀 {stripped}\n")
+            else:
+                enhanced_lines.append(f"\n#### 🚀 {stripped}\n")
             continue
             
         # 增强任务列表
@@ -1352,6 +1363,11 @@ custom_css = """
 
 /* 响应式优化 */
 @media (max-width: 768px) {
+    .main-container {
+        max-width: 100%;
+        padding: 10px;
+    }
+    
     .prompts-highlight {
         padding: 1rem;
         margin: 1rem 0;
@@ -1364,6 +1380,50 @@ custom_css = """
     .prompt-code-block pre {
         padding: 1rem;
         font-size: 0.85rem;
+    }
+    
+    .prompt-copy-section {
+        margin: 0.5rem 0;
+        padding: 0.25rem;
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .individual-copy-btn {
+        width: 100% !important;
+        justify-content: center !important;
+        margin: 0.25rem 0 !important;
+        padding: 0.5rem 1rem !important;
+        font-size: 0.8rem !important;
+    }
+    
+    #plan_result h1 {
+        font-size: 2rem;
+    }
+    
+    #plan_result h2 {
+        font-size: 1.5rem;
+    }
+    
+    #plan_result h3 {
+        font-size: 1.25rem;
+        padding: 0.375rem 0.75rem;
+    }
+}
+
+@media (max-width: 1024px) and (min-width: 769px) {
+    .main-container {
+        max-width: 95%;
+        padding: 15px;
+    }
+    
+    .individual-copy-btn {
+        padding: 0.45rem 0.9rem !important;
+        font-size: 0.78rem !important;
+    }
+    
+    .prompt-copy-section {
+        margin: 0.6rem 0;
     }
 }
 
@@ -1488,31 +1548,33 @@ custom_css = """
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    margin: 1rem 0;
-    padding: 0.5rem;
+    margin: 0.75rem 0;
+    padding: 0.375rem;
     background: rgba(66, 153, 225, 0.05);
-    border-radius: 0.5rem;
+    border-radius: 0.375rem;
 }
 
 .individual-copy-btn {
     background: linear-gradient(45deg, #4299e1, #3182ce) !important;
     border: none !important;
     color: white !important;
-    padding: 0.6rem 1.2rem !important;
-    border-radius: 1.5rem !important;
-    font-size: 0.85rem !important;
-    font-weight: 600 !important;
+    padding: 0.4rem 0.8rem !important;
+    border-radius: 0.75rem !important;
+    font-size: 0.75rem !important;
+    font-weight: 500 !important;
     cursor: pointer !important;
-    transition: all 0.3s ease !important;
-    box-shadow: 0 2px 8px rgba(66, 153, 225, 0.3) !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 1px 4px rgba(66, 153, 225, 0.2) !important;
     display: inline-flex !important;
     align-items: center !important;
-    gap: 0.5rem !important;
+    gap: 0.25rem !important;
+    min-width: auto !important;
+    max-height: 32px !important;
 }
 
 .individual-copy-btn:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 4px 15px rgba(66, 153, 225, 0.4) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(66, 153, 225, 0.3) !important;
     background: linear-gradient(45deg, #3182ce, #2c5aa0) !important;
 }
 
@@ -1539,10 +1601,12 @@ custom_css = """
 
 .dark .individual-copy-btn {
     background: linear-gradient(45deg, #63b3ed, #4299e1) !important;
+    box-shadow: 0 1px 4px rgba(99, 179, 237, 0.2) !important;
 }
 
 .dark .individual-copy-btn:hover {
     background: linear-gradient(45deg, #4299e1, #3182ce) !important;
+    box-shadow: 0 2px 8px rgba(99, 179, 237, 0.3) !important;
 }
 
 /* Fix accordion height issue - Agent应用架构说明折叠问题 */
@@ -2354,3 +2418,4 @@ if __name__ == "__main__":
         share=False,
         show_error=config.debug
     )
+    
