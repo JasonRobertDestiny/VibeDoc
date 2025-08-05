@@ -5,12 +5,16 @@ import logging
 import json
 import tempfile
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, List
 from urllib.parse import urlparse
 
 # 导入模块化组件
 from config import config
 from mcp_manager import mcp_manager
+from prompt_optimizer import prompt_optimizer
+from explanation_manager import explanation_manager, ProcessingStage
+from plan_editor import plan_editor
+from export_manager import export_manager
 
 # 配置日志
 logging.basicConfig(
@@ -33,19 +37,58 @@ if config_errors:
     for key, error in config_errors.items():
         logger.warning(f"⚠️ 配置警告 {key}: {error}")
 
-# 初始化Doubao MCP服务（如果启用）
-doubao_service = config.get_mcp_service("doubao")
-if doubao_service and doubao_service.enabled:
-    logger.info("🎨 初始化Doubao MCP服务...")
-    try:
-        requests.post(
-            doubao_service.url,
-            json={"action": "set_api_key", "params": {"api_key": doubao_service.api_key}},
-            timeout=10
-        )
-        logger.info("✅ Doubao API Key设置成功")
-    except Exception as e:
-        logger.error(f"❌ Doubao API Key设置失败: {e}")
+def get_processing_explanation() -> str:
+    """获取处理过程的详细说明"""
+    return explanation_manager.get_processing_explanation()
+
+def show_explanation() -> Tuple[str, str, str]:
+    """显示处理过程说明"""
+    explanation = get_processing_explanation()
+    return (
+        gr.update(visible=False),  # 隐藏plan_output
+        gr.update(value=explanation, visible=True),  # 显示process_explanation
+        gr.update(visible=True)   # 显示hide_explanation_btn
+    )
+
+def hide_explanation() -> Tuple[str, str, str]:
+    """隐藏处理过程说明"""
+    return (
+        gr.update(visible=True),   # 显示plan_output
+        gr.update(visible=False),  # 隐藏process_explanation
+        gr.update(visible=False)   # 隐藏hide_explanation_btn
+    )
+
+def optimize_user_idea(user_idea: str) -> Tuple[str, str]:
+    """
+    优化用户输入的创意描述
+    
+    Args:
+        user_idea: 用户原始输入
+        
+    Returns:
+        Tuple[str, str]: (优化后的描述, 优化信息)
+    """
+    if not user_idea or not user_idea.strip():
+        return "", "❌ 请先输入您的产品创意！"
+    
+    # 调用提示词优化器
+    success, optimized_idea, suggestions = prompt_optimizer.optimize_user_input(user_idea)
+    
+    if success:
+        optimization_info = f"""
+## ✨ 创意优化成功！
+
+**🎯 优化建议：**
+{suggestions}
+
+**💡 提示：** 优化后的描述更加详细和专业，将帮助生成更高质量的开发计划。您可以：
+- 直接使用优化后的描述生成计划
+- 根据需要手动调整优化结果
+- 点击"重新优化"获得不同的优化建议
+"""
+        return optimized_idea, optimization_info
+    else:
+        return user_idea, f"⚠️ 优化失败：{suggestions}"
 
 def validate_input(user_idea: str) -> Tuple[bool, str]:
     """验证用户输入"""
@@ -287,25 +330,56 @@ def validate_and_fix_content(content: str) -> str:
     
     logger.info("🔍 开始内容验证和修复...")
     
-    # 计算质量分数
-    quality_score = calculate_quality_score(content)
-    logger.info(f"📊 内容质量分数: {quality_score}/100")
+    # 记录修复项目
+    fixes_applied = []
+    
+    # 计算初始质量分数
+    initial_quality_score = calculate_quality_score(content)
+    logger.info(f"📊 初始内容质量分数: {initial_quality_score}/100")
     
     # 1. 修复Mermaid图表语法错误
+    original_content = content
     content = fix_mermaid_syntax(content)
+    if content != original_content:
+        fixes_applied.append("修复Mermaid图表语法")
     
     # 2. 验证和清理虚假链接
+    original_content = content
     content = validate_and_clean_links(content)
+    if content != original_content:
+        fixes_applied.append("清理虚假链接")
     
     # 3. 修复日期一致性
+    original_content = content
     content = fix_date_consistency(content)
+    if content != original_content:
+        fixes_applied.append("更新过期日期")
     
     # 4. 修复格式问题
+    original_content = content
     content = fix_formatting_issues(content)
+    if content != original_content:
+        fixes_applied.append("修复格式问题")
     
     # 重新计算质量分数
     final_quality_score = calculate_quality_score(content)
+    
+    # 添加质量报告（如果有显著改进）
+    if final_quality_score > initial_quality_score + 5:
+        improvement = final_quality_score - initial_quality_score
+        quality_note = f"""
+> **📈 质量提升报告**  
+> 初始评分：{initial_quality_score}/100 → 优化后：{final_quality_score}/100 (提升{improvement}分)  
+> 应用修复：{', '.join(fixes_applied) if fixes_applied else '无需修复'}
+
+---
+
+"""
+        content = quality_note + content
+    
     logger.info(f"✅ 内容验证和修复完成，最终质量分数: {final_quality_score}/100")
+    if fixes_applied:
+        logger.info(f"🔧 应用了以下修复: {', '.join(fixes_applied)}")
     
     return content
 
@@ -374,7 +448,7 @@ def calculate_quality_score(content: str) -> int:
     return min(score, max_score)
 
 def fix_mermaid_syntax(content: str) -> str:
-    """修复Mermaid图表中的语法错误"""
+    """修复Mermaid图表中的语法错误并优化渲染"""
     import re
     
     # 修复常见的Mermaid语法错误
@@ -393,15 +467,59 @@ def fix_mermaid_syntax(content: str) -> str:
         
         # 移除标题级别错误
         (r'\n##+ 🎯 ([A-Z])', r'\n    \1'),
+        
+        # 修复中文节点名称的问题
+        (r'([A-Z]+)\[([^\]]*[^\x00-\x7F][^\]]*)\]', r'\1["⚡\2"]'),
+        
+        # 确保流程图语法正确
+        (r'graph TB\n\s*graph', r'graph TB'),
+        (r'flowchart TD\n\s*flowchart', r'flowchart TD'),
+        
+        # 修复箭头语法
+        (r'-->', r' --> '),
+        (r'-->([A-Z])', r'--> \1'),
+        (r'([A-Z])-->', r'\1 -->'),
     ]
     
     for pattern, replacement in fixes:
         content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
     
+    # 添加Mermaid渲染增强标记
+    content = enhance_mermaid_blocks(content)
+    
+    return content
+
+def enhance_mermaid_blocks(content: str) -> str:
+    """增强Mermaid代码块的渲染支持"""
+    import re
+    
+    # 查找所有Mermaid代码块
+    mermaid_pattern = r'```mermaid\n(.*?)\n```'
+    
+    def enhance_mermaid_block(match):
+        mermaid_content = match.group(1)
+        
+        # 为Mermaid块添加渲染ID和包装器
+        block_id = f"mermaid-{hash(mermaid_content) % 100000}"
+        
+        enhanced_block = f'''```mermaid
+{mermaid_content}
+```
+
+<div class="mermaid-wrapper" id="{block_id}">
+<div class="mermaid-render">
+{mermaid_content}
+</div>
+</div>'''
+        
+        return enhanced_block
+    
+    content = re.sub(mermaid_pattern, enhance_mermaid_block, content, flags=re.DOTALL)
+    
     return content
 
 def validate_and_clean_links(content: str) -> str:
-    """验证和清理虚假链接"""
+    """验证和清理虚假链接，增强链接质量"""
     import re
     
     # 检测并移除虚假链接模式
@@ -410,8 +528,14 @@ def validate_and_clean_links(content: str) -> str:
         r'\[([^\]]+)\]\(https?://github\.com/username/[^\)]+\)',
         r'\[([^\]]+)\]\(https?://[^/]*example\.com[^\)]*\)',
         r'\[([^\]]+)\]\(https?://[^/]*xxx\.com[^\)]*\)',
+        r'\[([^\]]+)\]\(https?://[^/]*test\.com[^\)]*\)',
+        r'\[([^\]]+)\]\(https?://localhost[^\)]*\)',
         r'https?://blog\.csdn\.net/username/article/details/\d+',
         r'https?://github\.com/username/[^\s\)]+',
+        r'https?://[^/]*example\.com[^\s\)]*',
+        r'https?://[^/]*xxx\.com[^\s\)]*',
+        r'https?://[^/]*test\.com[^\s\)]*',
+        r'https?://localhost[^\s\)]*',
     ]
     
     for pattern in fake_link_patterns:
@@ -423,6 +547,46 @@ def validate_and_clean_links(content: str) -> str:
                 return "（基于行业最佳实践）"
         
         content = re.sub(pattern, replace_fake_link, content, flags=re.IGNORECASE)
+    
+    # 验证并增强真实链接
+    content = enhance_real_links(content)
+    
+    return content
+
+def enhance_real_links(content: str) -> str:
+    """验证并增强真实链接的可用性"""
+    import re
+    
+    # 查找所有markdown链接
+    link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
+    
+    def validate_link(match):
+        link_text = match.group(1)
+        link_url = match.group(2)
+        
+        # 检查是否是有效的URL格式
+        if not validate_url(link_url):
+            return f"**{link_text}** (参考资源)"
+        
+        # 检查是否是常见的技术文档网站
+        trusted_domains = [
+            'docs.python.org', 'nodejs.org', 'reactjs.org', 'vuejs.org',
+            'angular.io', 'flask.palletsprojects.com', 'fastapi.tiangolo.com',
+            'docker.com', 'kubernetes.io', 'github.com', 'gitlab.com',
+            'stackoverflow.com', 'developer.mozilla.org', 'w3schools.com',
+            'jwt.io', 'redis.io', 'mongodb.com', 'postgresql.org',
+            'mysql.com', 'nginx.org', 'apache.org'
+        ]
+        
+        # 如果是受信任的域名，保留链接
+        for domain in trusted_domains:
+            if domain in link_url.lower():
+                return f"[{link_text}]({link_url})"
+        
+        # 对于其他链接，转换为安全的文本引用
+        return f"**{link_text}** (技术参考)"
+    
+    content = re.sub(link_pattern, validate_link, content)
     
     return content
 
@@ -477,96 +641,6 @@ def fix_formatting_issues(content: str) -> str:
     
     return content
 
-def generate_concept_logo(user_idea: str) -> str:
-    """生成概念LOGO和架构图 - 使用模块化配置"""
-    doubao_service = config.get_mcp_service("doubao")
-    if not doubao_service or not doubao_service.enabled:
-        return ""
-    
-    try:
-        logger.info("🎨 使用Doubao MCP生成概念图像...")
-        
-        # 生成多种类型的图像
-        images_generated = []
-        
-        # 1. 概念LOGO
-        logo_prompt = f"Logo design for {user_idea}, minimalist, modern, professional, vector style, clean background, high quality"
-        logo_result = generate_image_with_doubao(logo_prompt, "concept-logo", doubao_service)
-        if logo_result:
-            images_generated.append(("🎨 概念LOGO", logo_result))
-        
-        # 2. 系统架构图
-        arch_prompt = f"System architecture diagram for {user_idea}, technical illustration, components and connections, professional style, clean design"
-        arch_result = generate_image_with_doubao(arch_prompt, "architecture", doubao_service)
-        if arch_result:
-            images_generated.append(("🏗️ 系统架构图", arch_result))
-        
-        # 3. 用户界面设计图
-        ui_prompt = f"User interface mockup for {user_idea}, modern UI design, clean layout, professional appearance"
-        ui_result = generate_image_with_doubao(ui_prompt, "ui-design", doubao_service)
-        if ui_result:
-            images_generated.append(("📱 界面设计图", ui_result))
-        
-        # 组装所有生成的图像
-        if images_generated:
-            image_content = "\n\n---\n\n## 🎨 AI生成的概念图像\n\n"
-            for title, url in images_generated:
-                image_content += f"### {title}\n![{title}]({url})\n\n"
-            
-            logger.info(f"✅ 成功生成 {len(images_generated)} 个概念图像")
-            return image_content
-        else:
-            logger.warning("⚠️ 未能生成任何概念图像")
-            return ""
-            
-    except Exception as e:
-        logger.error(f"💥 概念图像生成错误: {str(e)}")
-        return ""
-
-def generate_image_with_doubao(prompt: str, image_type: str, doubao_service) -> str:
-    """使用豆包MCP生成单个图像"""
-    try:
-        # 构建Doubao text_to_image调用的JSON载荷
-        image_payload = {
-            "action": "text_to_image",
-            "params": {
-                "prompt": prompt,
-                "size": "1024x1024",
-                "style": "professional"
-            }
-        }
-        
-        # 调用Doubao text_to_image
-        image_response = requests.post(
-            doubao_service.url,
-            json=image_payload,
-            timeout=doubao_service.timeout
-        )
-        
-        if image_response.status_code == 200:
-            image_data = image_response.json()
-            # 解析图像URL（根据实际响应格式调整）
-            if "result" in image_data and image_data["result"] and len(image_data["result"]) > 0:
-                image_url = image_data["result"][0].get("url", "")
-                if image_url:
-                    logger.info(f"✅ {image_type} 图像生成成功")
-                    return image_url
-                else:
-                    logger.warning(f"⚠️ {image_type} 响应中未找到图像URL")
-            else:
-                logger.warning(f"⚠️ {image_type} 图像生成响应格式无效")
-        else:
-            logger.error(f"❌ {image_type} 图像生成失败: HTTP {image_response.status_code}")
-            
-    except requests.exceptions.Timeout:
-        logger.error(f"⏰ {image_type} 图像生成超时")
-    except requests.exceptions.ConnectionError:
-        logger.error(f"🔌 {image_type} 图像生成连接失败")
-    except Exception as e:
-        logger.error(f"💥 {image_type} 图像生成错误: {str(e)}")
-    
-    return ""
-
 def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[str, str, str]:
     """
     基于用户创意生成完整的产品开发计划和对应的AI编程助手提示词。
@@ -578,12 +652,46 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
     Returns:
         Tuple[str, str, str]: 开发计划、AI编程提示词、临时文件路径
     """
-    # 验证输入
+    # 开始处理链条追踪
+    explanation_manager.start_processing()
+    start_time = datetime.now()
+    
+    # 步骤1: 验证输入
+    validation_start = datetime.now()
     is_valid, error_msg = validate_input(user_idea)
+    validation_duration = (datetime.now() - validation_start).total_seconds()
+    
+    explanation_manager.add_processing_step(
+        stage=ProcessingStage.INPUT_VALIDATION,
+        title="输入验证",
+        description="验证用户输入的创意描述是否符合要求",
+        success=is_valid,
+        details={
+            "输入长度": len(user_idea.strip()) if user_idea else 0,
+            "包含参考链接": bool(reference_url),
+            "验证结果": "通过" if is_valid else error_msg
+        },
+        duration=validation_duration,
+        quality_score=100 if is_valid else 0,
+        evidence=f"用户输入: '{user_idea[:50]}...' (长度: {len(user_idea.strip()) if user_idea else 0}字符)"
+    )
+    
     if not is_valid:
         return error_msg, "", ""
-        
+    
+    # 步骤2: API密钥检查
     if not API_KEY:
+        explanation_manager.add_processing_step(
+            stage=ProcessingStage.AI_GENERATION,
+            title="API密钥检查",
+            description="检查AI模型API密钥配置",
+            success=False,
+            details={"错误": "API密钥未配置"},
+            duration=0.0,
+            quality_score=0,
+            evidence="系统环境变量中未找到SILICONFLOW_API_KEY"
+        )
+        
         logger.error("API key not configured")
         error_msg = """
 ## ❌ 配置错误：未设置API密钥
@@ -612,8 +720,25 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
 """
         return error_msg, "", ""
     
-    # 获取外部知识库内容
+    # 步骤3: 获取外部知识库内容
+    knowledge_start = datetime.now()
     retrieved_knowledge = fetch_external_knowledge(reference_url)
+    knowledge_duration = (datetime.now() - knowledge_start).total_seconds()
+    
+    explanation_manager.add_processing_step(
+        stage=ProcessingStage.KNOWLEDGE_RETRIEVAL,
+        title="外部知识获取",
+        description="从MCP服务获取外部参考知识",
+        success=bool(retrieved_knowledge and "成功获取" in retrieved_knowledge),
+        details={
+            "参考链接": reference_url or "无",
+            "MCP服务状态": mcp_manager.get_status_summary(),
+            "知识内容长度": len(retrieved_knowledge) if retrieved_knowledge else 0
+        },
+        duration=knowledge_duration,
+        quality_score=80 if retrieved_knowledge else 50,
+        evidence=f"获取的知识内容: '{retrieved_knowledge[:100]}...' (长度: {len(retrieved_knowledge) if retrieved_knowledge else 0}字符)"
+    )
     
     # 获取当前日期并计算项目开始日期
     current_date = datetime.now()
@@ -657,30 +782,54 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
 - 必须包含技术栈对比表格
 - 必须包含项目里程碑时间表
 
-🎯 Mermaid图表格式要求：
+🎯 Mermaid图表格式要求（严格遵循）：
+
+**架构图示例**：
 ```mermaid
-graph TD
-    A[开始] --> B[需求分析]
-    B --> C[技术选型]
-    C --> D[系统设计]
-    D --> E[开发实施]
-    E --> F[测试部署]
-    F --> G[上线运营]
+flowchart TD
+    A["用户界面"] --> B["业务逻辑层"]
+    B --> C["数据访问层"]
+    C --> D["数据库"]
+    B --> E["外部API"]
+    F["缓存"] --> B
 ```
 
-🎯 甘特图格式要求（必须使用真实的项目开始日期）：
+**流程图示例**：
+```mermaid
+flowchart TD
+    Start([开始]) --> Input[用户输入]
+    Input --> Validate{{验证输入}}
+    Validate -->|有效| Process[处理数据]
+    Validate -->|无效| Error[显示错误]
+    Process --> Save[保存结果]
+    Save --> Success[成功提示]
+    Error --> Input
+    Success --> End([结束])
+```
+
+**甘特图示例（必须使用真实的项目开始日期）**：
 ```mermaid
 gantt
     title 项目开发甘特图
     dateFormat YYYY-MM-DD
+    axisFormat %m-%d
+    
     section 需求分析
-    需求分析     :a1, {project_start_str}, 7d
+    需求调研     :done, req1, {project_start_str}, 3d
+    需求整理     :done, req2, after req1, 4d
+    
     section 系统设计
-    系统设计     :a2, after a1, 14d
+    架构设计     :active, design1, after req2, 7d
+    UI设计       :design2, after design1, 5d
+    
     section 开发实施
-    开发实施     :a3, after a2, 28d
-    section 测试部署
-    测试部署     :a4, after a3, 14d
+    后端开发     :dev1, after design2, 14d
+    前端开发     :dev2, after design2, 14d
+    集成测试     :test1, after dev1, 7d
+    
+    section 部署上线
+    部署准备     :deploy1, after test1, 3d
+    正式上线     :deploy2, after deploy1, 2d
 ```
 
 ⚠️ **日期生成规则**：
@@ -780,11 +929,6 @@ gantt
                 # 应用内容验证和修复
                 final_plan_text = validate_and_fix_content(final_plan_text)
                 
-                # 生成概念LOGO图像
-                logo_content = generate_concept_logo(user_idea)
-                if logo_content:
-                    final_plan_text += logo_content
-                
                 # 创建临时文件
                 temp_file = create_temp_markdown_file(final_plan_text)
                 
@@ -832,8 +976,398 @@ def create_temp_markdown_file(content: str) -> str:
         logger.error(f"Failed to create temporary file: {e}")
         return ""
 
+def enable_plan_editing(plan_content: str) -> Tuple[str, str]:
+    """启用方案编辑功能"""
+    try:
+        # 解析方案内容
+        sections = plan_editor.parse_plan_content(plan_content)
+        editable_sections = plan_editor.get_editable_sections()
+        
+        # 生成编辑界面HTML
+        edit_interface = generate_edit_interface(editable_sections)
+        
+        # 生成编辑摘要
+        summary = plan_editor.get_edit_summary()
+        edit_summary = f"""
+## 📝 方案编辑模式已启用
+
+**📊 编辑统计**：
+- 总段落数：{summary['total_sections']}
+- 可编辑段落：{summary['editable_sections']}
+- 已编辑段落：{summary['edited_sections']}
+
+**💡 编辑说明**：
+- 点击下方段落可进行编辑
+- 系统会自动保存编辑历史
+- 可随时恢复到原始版本
+
+---
+"""
+        
+        return edit_interface, edit_summary
+        
+    except Exception as e:
+        logger.error(f"启用编辑失败: {str(e)}")
+        return "", f"❌ 启用编辑失败: {str(e)}"
+
+def generate_edit_interface(editable_sections: List[Dict]) -> str:
+    """生成编辑界面HTML"""
+    interface_html = """
+<div class="plan-editor-container">
+    <div class="editor-header">
+        <h3>📝 分段编辑器</h3>
+        <p>点击任意段落进行编辑，系统会自动保存您的更改</p>
+    </div>
+    
+    <div class="sections-container">
+"""
+    
+    for section in editable_sections:
+        section_html = f"""
+        <div class="editable-section" data-section-id="{section['id']}" data-section-type="{section['type']}">
+            <div class="section-header">
+                <span class="section-type">{get_section_type_emoji(section['type'])}</span>
+                <span class="section-title">{section['title']}</span>
+                <button class="edit-section-btn" onclick="editSection('{section['id']}')">
+                    ✏️ 编辑
+                </button>
+            </div>
+            
+            <div class="section-preview">
+                <div class="preview-content">{section['preview']}</div>
+                <div class="section-content" style="display: none;">{_html_escape(section['content'])}</div>
+            </div>
+        </div>
+"""
+        interface_html += section_html
+    
+    interface_html += """
+    </div>
+    
+    <div class="editor-actions">
+        <button class="apply-changes-btn" onclick="applyAllChanges()">
+            ✅ 应用所有更改
+        </button>
+        <button class="reset-changes-btn" onclick="resetAllChanges()">
+            🔄 重置所有更改
+        </button>
+    </div>
+</div>
+
+<script>
+function editSection(sectionId) {
+    const section = document.querySelector(`[data-section-id="${sectionId}"]`);
+    const content = section.querySelector('.section-content').textContent;
+    const type = section.getAttribute('data-section-type');
+    
+    // 检测当前主题
+    const isDark = document.documentElement.classList.contains('dark');
+    
+    // 创建编辑对话框
+    const editDialog = document.createElement('div');
+    editDialog.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+    `;
+    
+    editDialog.innerHTML = `
+        <div style="
+            background: ${isDark ? '#2d3748' : 'white'};
+            color: ${isDark ? '#f7fafc' : '#2d3748'};
+            padding: 2rem;
+            border-radius: 1rem;
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        ">
+            <h3 style="margin-bottom: 1rem; color: ${isDark ? '#f7fafc' : '#2d3748'};">
+                ✏️ 编辑段落 - ${type}
+            </h3>
+            <textarea
+                id="section-editor-${sectionId}"
+                style="
+                    width: 100%;
+                    height: 400px;
+                    padding: 1rem;
+                    border: 2px solid ${isDark ? '#4a5568' : '#e2e8f0'};
+                    border-radius: 0.5rem;
+                    font-family: 'Fira Code', monospace;
+                    font-size: 0.9rem;
+                    resize: vertical;
+                    line-height: 1.6;
+                    background: ${isDark ? '#1a202c' : 'white'};
+                    color: ${isDark ? '#f7fafc' : '#2d3748'};
+                "
+                placeholder="在此编辑段落内容..."
+            >${content}</textarea>
+            <div style="margin-top: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem;">编辑说明 (可选):</label>
+                <input
+                    type="text"
+                    id="edit-comment-${sectionId}"
+                    style="
+                        width: 100%;
+                        padding: 0.5rem;
+                        border: 1px solid ${isDark ? '#4a5568' : '#e2e8f0'};
+                        border-radius: 0.25rem;
+                        background: ${isDark ? '#1a202c' : 'white'};
+                        color: ${isDark ? '#f7fafc' : '#2d3748'};
+                    "
+                    placeholder="简要说明您的更改..."
+                />
+            </div>
+            <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                <button
+                    onclick="document.body.removeChild(this.closest('.edit-dialog-overlay'))"
+                    style="
+                        padding: 0.5rem 1rem;
+                        border: 1px solid ${isDark ? '#4a5568' : '#cbd5e0'};
+                        background: ${isDark ? '#2d3748' : 'white'};
+                        color: ${isDark ? '#f7fafc' : '#4a5568'};
+                        border-radius: 0.5rem;
+                        cursor: pointer;
+                    "
+                >取消</button>
+                <button
+                    onclick="saveSectionEdit('${sectionId}')"
+                    style="
+                        padding: 0.5rem 1rem;
+                        background: linear-gradient(45deg, #667eea, #764ba2);
+                        color: white;
+                        border: none;
+                        border-radius: 0.5rem;
+                        cursor: pointer;
+                    "
+                >保存</button>
+            </div>
+        </div>
+    `;
+    
+    editDialog.className = 'edit-dialog-overlay';
+    document.body.appendChild(editDialog);
+    
+    // ESC键关闭
+    const escapeHandler = (e) => {
+        if (e.key === 'Escape') {
+            document.body.removeChild(editDialog);
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    };
+    document.addEventListener('keydown', escapeHandler);
+    
+    // 点击外部关闭
+    editDialog.addEventListener('click', (e) => {
+        if (e.target === editDialog) {
+            document.body.removeChild(editDialog);
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    });
+}
+
+function saveSectionEdit(sectionId) {
+    const newContent = document.getElementById(`section-editor-${sectionId}`).value;
+    const comment = document.getElementById(`edit-comment-${sectionId}`).value;
+    
+    // 更新隐藏组件的值来触发Gradio事件
+    const sectionIdInput = document.querySelector('#section_id_input textarea');
+    const sectionContentInput = document.querySelector('#section_content_input textarea'); 
+    const sectionCommentInput = document.querySelector('#section_comment_input textarea');
+    const updateTrigger = document.querySelector('#section_update_trigger textarea');
+    
+    if (sectionIdInput && sectionContentInput && sectionCommentInput && updateTrigger) {
+        sectionIdInput.value = sectionId;
+        sectionContentInput.value = newContent;
+        sectionCommentInput.value = comment;
+        updateTrigger.value = Date.now().toString(); // 触发更新
+        
+        // 手动触发change事件
+        sectionIdInput.dispatchEvent(new Event('input'));
+        sectionContentInput.dispatchEvent(new Event('input'));
+        sectionCommentInput.dispatchEvent(new Event('input'));
+        updateTrigger.dispatchEvent(new Event('input'));
+    }
+    
+    // 关闭对话框
+    document.body.removeChild(document.querySelector('.edit-dialog-overlay'));
+    
+    // 更新预览
+    const section = document.querySelector(`[data-section-id="${sectionId}"]`);
+    const preview = section.querySelector('.preview-content');
+    preview.textContent = newContent.substring(0, 100) + '...';
+    
+    // 显示保存成功提示
+    showNotification('✅ 段落已保存', 'success');
+}
+
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 1rem 1.5rem;
+        background: ${type === 'success' ? '#48bb78' : '#4299e1'};
+        color: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        z-index: 10001;
+        animation: slideIn 0.3s ease-out;
+    `;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-in forwards';
+        setTimeout(() => document.body.removeChild(notification), 300);
+    }, 3000);
+}
+
+// 添加必要的CSS动画
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    
+    @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+`;
+document.head.appendChild(style);
+</script>
+"""
+    
+    return interface_html
+
+def _html_escape(text: str) -> str:
+    """HTML转义函数"""
+    import html
+    return html.escape(text)
+
+def get_section_type_emoji(section_type: str) -> str:
+    """获取段落类型对应的emoji"""
+    type_emojis = {
+        'heading': '📋',
+        'paragraph': '📝',
+        'list': '📄',
+        'code': '💻',
+        'table': '📊'
+    }
+    return type_emojis.get(section_type, '📝')
+
+def update_section_content(section_id: str, new_content: str, comment: str) -> str:
+    """更新段落内容"""
+    try:
+        success = plan_editor.update_section(section_id, new_content, comment)
+        
+        if success:
+            # 获取更新后的完整内容
+            updated_content = plan_editor.get_modified_content()
+            
+            # 格式化并返回
+            formatted_content = format_response(updated_content)
+            
+            logger.info(f"段落 {section_id} 更新成功")
+            return formatted_content
+        else:
+            logger.error(f"段落 {section_id} 更新失败")
+            return "❌ 更新失败"
+            
+    except Exception as e:
+        logger.error(f"更新段落内容失败: {str(e)}")
+        return f"❌ 更新失败: {str(e)}"
+
+def get_edit_history() -> str:
+    """获取编辑历史"""
+    try:
+        history = plan_editor.get_edit_history()
+        
+        if not history:
+            return "暂无编辑历史"
+        
+        history_html = """
+<div class="edit-history">
+    <h3>📜 编辑历史</h3>
+    <div class="history-list">
+"""
+        
+        for i, edit in enumerate(reversed(history[-10:]), 1):  # 显示最近10次编辑
+            timestamp = datetime.fromisoformat(edit['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
+            history_html += f"""
+            <div class="history-item">
+                <div class="history-header">
+                    <span class="history-index">#{i}</span>
+                    <span class="history-time">{timestamp}</span>
+                    <span class="history-section">段落: {edit['section_id']}</span>
+                </div>
+                <div class="history-comment">{edit['user_comment'] or '无说明'}</div>
+            </div>
+"""
+        
+        history_html += """
+    </div>
+</div>
+"""
+        
+        return history_html
+        
+    except Exception as e:
+        logger.error(f"获取编辑历史失败: {str(e)}")
+        return f"❌ 获取编辑历史失败: {str(e)}"
+
+def reset_plan_edits() -> str:
+    """重置所有编辑"""
+    try:
+        plan_editor.reset_to_original()
+        logger.info("已重置所有编辑")
+        return "✅ 已重置到原始版本"
+    except Exception as e:
+        logger.error(f"重置失败: {str(e)}")
+        return f"❌ 重置失败: {str(e)}"
+
+def fix_links_for_new_window(content: str) -> str:
+    """修复所有链接为新窗口打开，解决魔塔平台链接问题"""
+    import re
+    
+    # 匹配所有markdown链接格式 [text](url)
+    def replace_markdown_link(match):
+        text = match.group(1)
+        url = match.group(2)
+        return f'<a href="{url}" target="_blank" rel="noopener noreferrer">{text}</a>'
+    
+    # 替换markdown链接
+    content = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', replace_markdown_link, content)
+    
+    # 匹配所有HTML链接并添加target="_blank"
+    def add_target_blank(match):
+        full_tag = match.group(0)
+        if 'target=' not in full_tag:
+            # 在>前添加target="_blank"
+            return full_tag.replace('>', ' target="_blank" rel="noopener noreferrer">')
+        return full_tag
+    
+    # 替换HTML链接
+    content = re.sub(r'<a [^>]*href=[^>]*>', add_target_blank, content)
+    
+    return content
+
 def format_response(content: str) -> str:
     """格式化AI回复，美化显示并保持原始AI生成的提示词"""
+    
+    # 修复所有链接为新窗口打开
+    content = fix_links_for_new_window(content)
     
     # 添加时间戳和格式化标题
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -961,6 +1495,9 @@ def enhance_prompts_display(prompts_content: str) -> str:
             enhanced_lines.append('<div class="prompt-copy-section">')
             enhanced_lines.append(f'<button class="individual-copy-btn" data-prompt-id="{current_prompt_id}" data-prompt-content="{encoded_prompt}">')
             enhanced_lines.append('    📋 复制此提示词')
+            enhanced_lines.append('</button>')
+            enhanced_lines.append(f'<button class="edit-prompt-btn" data-prompt-id="{current_prompt_id}" data-prompt-content="{encoded_prompt}">')
+            enhanced_lines.append('    ✏️ 编辑提示词')
             enhanced_lines.append('</button>')
             enhanced_lines.append('<span class="copy-success-msg" id="copy-success-' + str(current_prompt_id) + '" style="display: none; color: #28a745; margin-left: 10px;">✅ 已复制!</span>')
             enhanced_lines.append('</div>')
@@ -1558,6 +2095,122 @@ custom_css = """
     color: #c6f6d5 !important;
 }
 
+/* 优化按钮样式 */
+.optimize-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600 !important;
+    margin-right: 10px !important;
+    transition: all 0.3s ease !important;
+    padding: 0.6rem 1.2rem !important;
+    border-radius: 1.5rem !important;
+}
+
+.optimize-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4) !important;
+}
+
+.reset-btn {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+    padding: 0.6rem 1.2rem !important;
+    border-radius: 1.5rem !important;
+}
+
+.reset-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(240, 147, 251, 0.4) !important;
+}
+
+.optimization-result {
+    margin-top: 15px !important;
+    padding: 15px !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    border-radius: 8px !important;
+    color: white !important;
+    border-left: 4px solid #4facfe !important;
+}
+
+.optimization-result h2 {
+    color: #fff !important;
+    margin-bottom: 10px !important;
+}
+
+.optimization-result strong {
+    color: #e0e6ff !important;
+}
+
+/* 处理过程说明区域样式 */
+.process-explanation {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+    border: 2px solid #cbd5e0 !important;
+    border-radius: 1rem !important;
+    padding: 2rem !important;
+    margin: 1rem 0 !important;
+    font-family: 'Inter', -apple-system, system-ui, sans-serif !important;
+}
+
+.process-explanation h1 {
+    color: #2b6cb0 !important;
+    font-size: 1.8rem !important;
+    margin-bottom: 1rem !important;
+    border-bottom: 3px solid #3182ce !important;
+    padding-bottom: 0.5rem !important;
+}
+
+.process-explanation h2 {
+    color: #2c7a7b !important;
+    font-size: 1.4rem !important;
+    margin-top: 1.5rem !important;
+    margin-bottom: 1rem !important;
+    background: linear-gradient(135deg, #e6fffa 0%, #f0fff4 100%) !important;
+    padding: 0.8rem !important;
+    border-radius: 0.5rem !important;
+    border-left: 4px solid #38b2ac !important;
+}
+
+.process-explanation h3 {
+    color: #38a169 !important;
+    font-size: 1.2rem !important;
+    margin-top: 1rem !important;
+    margin-bottom: 0.5rem !important;
+}
+
+.process-explanation strong {
+    color: #e53e3e !important;
+    font-weight: 600 !important;
+}
+
+.process-explanation ul {
+    padding-left: 1.5rem !important;
+}
+
+.process-explanation li {
+    margin-bottom: 0.5rem !important;
+    color: #4a5568 !important;
+}
+
+.explanation-btn {
+    background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+    padding: 0.6rem 1.2rem !important;
+    border-radius: 1.5rem !important;
+    margin-right: 10px !important;
+}
+
+.explanation-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(66, 153, 225, 0.4) !important;
+}
+
 /* 复制按钮增强 */
 .copy-btn {
     background: linear-gradient(45deg, #667eea, #764ba2) !important;
@@ -1662,6 +2315,47 @@ custom_css = """
     background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
     border-color: #60a5fa !important;
     color: #f8fafc !important;
+}
+
+/* Mermaid包装器样式 */
+.mermaid-wrapper {
+    margin: 2rem 0;
+    position: relative;
+    overflow: hidden;
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border: 2px solid #3b82f6;
+    box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
+}
+
+.mermaid-render {
+    min-height: 200px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dark .mermaid-wrapper {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #60a5fa;
+}
+
+/* 图表错误处理 */
+.mermaid-error {
+    background: #fef2f2;
+    border: 2px solid #f87171;
+    color: #991b1b;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    text-align: center;
+    font-family: monospace;
+}
+
+.dark .mermaid-error {
+    background: #7f1d1d;
+    border-color: #ef4444;
+    color: #fecaca;
 }
 
 /* Mermaid图表容器增强 */
@@ -1802,6 +2496,35 @@ custom_css = """
     transform: translateY(0) !important;
 }
 
+.edit-prompt-btn {
+    background: linear-gradient(45deg, #667eea, #764ba2) !important;
+    border: none !important;
+    color: white !important;
+    padding: 0.4rem 0.8rem !important;
+    border-radius: 0.75rem !important;
+    font-size: 0.75rem !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 1px 4px rgba(102, 126, 234, 0.2) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+    min-width: auto !important;
+    max-height: 32px !important;
+    margin-left: 0.5rem !important;
+}
+
+.edit-prompt-btn:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3) !important;
+    background: linear-gradient(45deg, #5a67d8, #667eea) !important;
+}
+
+.edit-prompt-btn:active {
+    transform: translateY(0) !important;
+}
+
 .copy-success-msg {
     font-size: 0.85rem;
     font-weight: 600;
@@ -1827,6 +2550,16 @@ custom_css = """
 .dark .individual-copy-btn:hover {
     background: linear-gradient(45deg, #4299e1, #3182ce) !important;
     box-shadow: 0 2px 8px rgba(99, 179, 237, 0.3) !important;
+}
+
+.dark .edit-prompt-btn {
+    background: linear-gradient(45deg, #9f7aea, #805ad5) !important;
+    box-shadow: 0 1px 4px rgba(159, 122, 234, 0.2) !important;
+}
+
+.dark .edit-prompt-btn:hover {
+    background: linear-gradient(45deg, #805ad5, #6b46c1) !important;
+    box-shadow: 0 2px 8px rgba(159, 122, 234, 0.3) !important;
 }
 
 /* Fix accordion height issue - Agent应用架构说明折叠问题 */
@@ -2155,6 +2888,317 @@ details.gr-accordion:not([open]) {
     transform: translateY(-1px) !important;
     box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3) !important;
 }
+
+/* 分段编辑器样式 */
+.plan-editor-container {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border: 2px solid #cbd5e0;
+    border-radius: 1rem;
+    padding: 2rem;
+    margin: 2rem 0;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.editor-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.editor-header h3 {
+    color: #2b6cb0;
+    margin-bottom: 0.5rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.editor-header p {
+    color: #4a5568;
+    margin: 0;
+    font-size: 1rem;
+}
+
+.sections-container {
+    display: grid;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.editable-section {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.editable-section:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.1);
+    transform: translateY(-2px);
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.section-type {
+    font-size: 1.2rem;
+    margin-right: 0.5rem;
+}
+
+.section-title {
+    font-weight: 600;
+    color: #2d3748;
+    flex: 1;
+}
+
+.edit-section-btn {
+    background: linear-gradient(45deg, #667eea, #764ba2) !important;
+    border: none !important;
+    color: white !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 0.5rem !important;
+    font-size: 0.9rem !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2) !important;
+}
+
+.edit-section-btn:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
+    background: linear-gradient(45deg, #5a67d8, #667eea) !important;
+}
+
+.section-preview {
+    position: relative;
+}
+
+.preview-content {
+    color: #4a5568;
+    line-height: 1.6;
+    font-size: 0.95rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 0.5rem;
+    border-left: 4px solid #3b82f6;
+}
+
+.editor-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    align-items: center;
+    padding-top: 1.5rem;
+    border-top: 2px solid #e2e8f0;
+}
+
+.apply-changes-btn {
+    background: linear-gradient(45deg, #48bb78, #38a169) !important;
+    border: none !important;
+    color: white !important;
+    padding: 0.8rem 1.5rem !important;
+    border-radius: 0.75rem !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3) !important;
+}
+
+.apply-changes-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(72, 187, 120, 0.4) !important;
+    background: linear-gradient(45deg, #38a169, #2f855a) !important;
+}
+
+.reset-changes-btn {
+    background: linear-gradient(45deg, #f093fb, #f5576c) !important;
+    border: none !important;
+    color: white !important;
+    padding: 0.8rem 1.5rem !important;
+    border-radius: 0.75rem !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(240, 147, 251, 0.3) !important;
+}
+
+.reset-changes-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(240, 147, 251, 0.4) !important;
+    background: linear-gradient(45deg, #f5576c, #e53e3e) !important;
+}
+
+/* 编辑历史样式 */
+.edit-history {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin: 1rem 0;
+}
+
+.edit-history h3 {
+    color: #2b6cb0;
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
+}
+
+.history-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.history-item {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+.history-item:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+}
+
+.history-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.history-index {
+    background: #3b82f6;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.history-time {
+    color: #6b7280;
+    font-family: 'Monaco', monospace;
+}
+
+.history-section {
+    color: #4a5568;
+    font-weight: 500;
+}
+
+.history-comment {
+    color: #374151;
+    font-style: italic;
+    padding-left: 1rem;
+    border-left: 2px solid #e5e7eb;
+}
+
+/* Dark模式适配 */
+.dark .plan-editor-container {
+    background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+    border-color: #4a5568;
+}
+
+.dark .editor-header h3 {
+    color: #63b3ed;
+}
+
+.dark .editor-header p {
+    color: #e2e8f0;
+}
+
+.dark .editable-section {
+    background: #374151;
+    border-color: #4a5568;
+}
+
+.dark .editable-section:hover {
+    border-color: #60a5fa;
+}
+
+.dark .section-title {
+    color: #f7fafc;
+}
+
+.dark .preview-content {
+    color: #e2e8f0;
+    background: #2d3748;
+    border-left-color: #60a5fa;
+}
+
+.dark .edit-history {
+    background: #2d3748;
+    border-color: #4a5568;
+}
+
+.dark .edit-history h3 {
+    color: #63b3ed;
+}
+
+.dark .history-item {
+    background: #374151;
+    border-color: #4a5568;
+}
+
+.dark .history-item:hover {
+    border-color: #60a5fa;
+}
+
+.dark .history-time {
+    color: #9ca3af;
+}
+
+.dark .history-section {
+    color: #e2e8f0;
+}
+
+.dark .history-comment {
+    color: #d1d5db;
+    border-left-color: #4a5568;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .plan-editor-container {
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .section-header {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: flex-start;
+    }
+    
+    .edit-section-btn {
+        align-self: flex-end;
+    }
+    
+    .editor-actions {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .apply-changes-btn,
+    .reset-changes-btn {
+        width: 100%;
+    }
+}
 """
 
 # 保持美化的Gradio界面
@@ -2178,9 +3222,23 @@ with gr.Blocks(
     <!-- 添加Mermaid.js支持 -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script>
+        // 增强的Mermaid配置
         mermaid.initialize({ 
             startOnLoad: true,
             theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            },
+            gantt: {
+                useMaxWidth: true,
+                gridLineStartPadding: 350,
+                fontSize: 13,
+                fontFamily: '"Inter", "Source Sans Pro", sans-serif',
+                sectionFontSize: 24,
+                numberSectionStyles: 4
+            },
             themeVariables: {
                 primaryColor: '#3b82f6',
                 primaryTextColor: '#1f2937',
@@ -2202,6 +3260,19 @@ with gr.Blocks(
             mermaid.initialize({ 
                 startOnLoad: true,
                 theme: theme,
+                flowchart: {
+                    useMaxWidth: true,
+                    htmlLabels: true,
+                    curve: 'basis'
+                },
+                gantt: {
+                    useMaxWidth: true,
+                    gridLineStartPadding: 350,
+                    fontSize: 13,
+                    fontFamily: '"Inter", "Source Sans Pro", sans-serif',
+                    sectionFontSize: 24,
+                    numberSectionStyles: 4
+                },
                 themeVariables: isDark ? {
                     primaryColor: '#60a5fa',
                     primaryTextColor: '#f8fafc',
@@ -2226,7 +3297,78 @@ with gr.Blocks(
                     tertiaryBkg: '#eff6ff'
                 }
             });
+            
+            // 重新渲染所有Mermaid图表
+            renderMermaidCharts();
         }
+        
+        // 强化的Mermaid图表渲染函数
+        function renderMermaidCharts() {
+            try {
+                // 清除现有的渲染内容
+                document.querySelectorAll('.mermaid').forEach(element => {
+                    if (element.getAttribute('data-processed') !== 'true') {
+                        element.removeAttribute('data-processed');
+                    }
+                });
+                
+                // 处理包装器中的Mermaid内容
+                document.querySelectorAll('.mermaid-render').forEach(element => {
+                    const content = element.textContent.trim();
+                    if (content && !element.classList.contains('rendered')) {
+                        element.innerHTML = content;
+                        element.classList.add('mermaid', 'rendered');
+                    }
+                });
+                
+                // 重新初始化Mermaid
+                mermaid.init(undefined, document.querySelectorAll('.mermaid:not([data-processed="true"])'));
+                
+            } catch (error) {
+                console.warn('Mermaid渲染警告:', error);
+                // 如果渲染失败，显示错误信息
+                document.querySelectorAll('.mermaid-render').forEach(element => {
+                    if (!element.classList.contains('rendered')) {
+                        element.innerHTML = '<div class="mermaid-error">图表渲染中，请稍候...</div>';
+                    }
+                });
+            }
+        }
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(renderMermaidCharts, 1000);
+        });
+        
+        // 监听内容变化，自动重新渲染图表
+        function observeContentChanges() {
+            const observer = new MutationObserver(function(mutations) {
+                let shouldRender = false;
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'childList') {
+                        mutation.addedNodes.forEach(function(node) {
+                            if (node.nodeType === Node.ELEMENT_NODE) {
+                                if (node.classList && (node.classList.contains('mermaid') || node.querySelector('.mermaid'))) {
+                                    shouldRender = true;
+                                }
+                            }
+                        });
+                    }
+                });
+                
+                if (shouldRender) {
+                    setTimeout(renderMermaidCharts, 500);
+                }
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+        
+        // 启动内容观察器
+        observeContentChanges();
         
         // 单独复制提示词功能
         function copyIndividualPrompt(promptId, promptContent) {
@@ -2243,6 +3385,131 @@ with gr.Blocks(
             } else {
                 fallbackCopy(decodedContent);
             }
+        }
+        
+        // 编辑提示词功能
+        function editIndividualPrompt(promptId, promptContent) {
+            // 解码HTML实体
+            const decodedContent = promptContent.replace(/\\n/g, '\n').replace(/\\'/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+            
+            // 检测当前主题
+            const isDark = document.documentElement.classList.contains('dark');
+            
+            // 创建编辑对话框
+            const editDialog = document.createElement('div');
+            editDialog.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+            `;
+            
+            editDialog.innerHTML = `
+                <div style="
+                    background: ${isDark ? '#2d3748' : 'white'};
+                    color: ${isDark ? '#f7fafc' : '#2d3748'};
+                    padding: 2rem;
+                    border-radius: 1rem;
+                    max-width: 80%;
+                    max-height: 80%;
+                    overflow-y: auto;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                ">
+                    <h3 style="margin-bottom: 1rem; color: ${isDark ? '#f7fafc' : '#2d3748'};">✏️ 编辑提示词</h3>
+                    <textarea
+                        id="prompt-editor-${promptId}"
+                        style="
+                            width: 100%;
+                            height: 300px;
+                            padding: 1rem;
+                            border: 2px solid ${isDark ? '#4a5568' : '#e2e8f0'};
+                            border-radius: 0.5rem;
+                            font-family: 'Fira Code', monospace;
+                            font-size: 0.9rem;
+                            resize: vertical;
+                            line-height: 1.5;
+                            background: ${isDark ? '#1a202c' : 'white'};
+                            color: ${isDark ? '#f7fafc' : '#2d3748'};
+                        "
+                        placeholder="在此编辑您的提示词..."
+                    >${decodedContent}</textarea>
+                    <div style="margin-top: 1rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                        <button
+                            id="cancel-edit-${promptId}"
+                            style="
+                                padding: 0.5rem 1rem;
+                                border: 1px solid ${isDark ? '#4a5568' : '#cbd5e0'};
+                                background: ${isDark ? '#2d3748' : 'white'};
+                                color: ${isDark ? '#f7fafc' : '#4a5568'};
+                                border-radius: 0.5rem;
+                                cursor: pointer;
+                                transition: all 0.2s ease;
+                            "
+                        >取消</button>
+                        <button
+                            id="save-edit-${promptId}"
+                            style="
+                                padding: 0.5rem 1rem;
+                                background: linear-gradient(45deg, #667eea, #764ba2);
+                                color: white;
+                                border: none;
+                                border-radius: 0.5rem;
+                                cursor: pointer;
+                                transition: all 0.2s ease;
+                            "
+                        >保存并复制</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(editDialog);
+            
+            // 绑定按钮事件
+            document.getElementById(`cancel-edit-${promptId}`).addEventListener('click', () => {
+                document.body.removeChild(editDialog);
+            });
+            
+            document.getElementById(`save-edit-${promptId}`).addEventListener('click', () => {
+                const editedContent = document.getElementById(`prompt-editor-${promptId}`).value;
+                
+                // 复制编辑后的内容
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(editedContent).then(() => {
+                        showCopySuccess(promptId);
+                        document.body.removeChild(editDialog);
+                    }).catch(err => {
+                        console.error('复制失败:', err);
+                        fallbackCopy(editedContent);
+                        document.body.removeChild(editDialog);
+                    });
+                } else {
+                    fallbackCopy(editedContent);
+                    document.body.removeChild(editDialog);
+                }
+            });
+            
+            // ESC键关闭
+            const escapeHandler = (e) => {
+                if (e.key === 'Escape') {
+                    document.body.removeChild(editDialog);
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
+            
+            // 点击外部关闭
+            editDialog.addEventListener('click', (e) => {
+                if (e.target === editDialog) {
+                    document.body.removeChild(editDialog);
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            });
         }
         
         // 降级复制方案
@@ -2271,13 +3538,21 @@ with gr.Blocks(
             }
         }
         
-        // 绑定复制按钮事件
+        // 绑定复制和编辑按钮事件
         function bindCopyButtons() {
             document.querySelectorAll('.individual-copy-btn').forEach(button => {
                 button.addEventListener('click', function() {
                     const promptId = this.getAttribute('data-prompt-id');
                     const promptContent = this.getAttribute('data-prompt-content');
                     copyIndividualPrompt(promptId, promptContent);
+                });
+            });
+            
+            document.querySelectorAll('.edit-prompt-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const promptId = this.getAttribute('data-prompt-id');
+                    const promptContent = this.getAttribute('data-prompt-content');
+                    editIndividualPrompt(promptId, promptContent);
                 });
             });
         }
@@ -2331,6 +3606,26 @@ with gr.Blocks(
                 lines=5,
                 max_lines=10,
                 show_label=False
+            )
+            
+            # 优化按钮和结果显示
+            with gr.Row():
+                optimize_btn = gr.Button(
+                    "✨ 优化创意描述",
+                    variant="secondary",
+                    size="sm",
+                    elem_classes="optimize-btn"
+                )
+                reset_btn = gr.Button(
+                    "🔄 重置",
+                    variant="secondary", 
+                    size="sm",
+                    elem_classes="reset-btn"
+                )
+            
+            optimization_result = gr.Markdown(
+                visible=False,
+                elem_classes="optimization-result"
             )
             
             reference_url_input = gr.Textbox(
@@ -2395,6 +3690,29 @@ with gr.Blocks(
             label="AI生成的开发计划"
         )
         
+        # 处理过程说明区域
+        process_explanation = gr.Markdown(
+            visible=False,
+            elem_classes="process-explanation"
+        )
+        
+        # 切换按钮
+        with gr.Row():
+            show_explanation_btn = gr.Button(
+                "🔍 查看AI生成过程详情",
+                variant="secondary",
+                size="sm",
+                elem_classes="explanation-btn",
+                visible=False
+            )
+            hide_explanation_btn = gr.Button(
+                "📝 返回开发计划",
+                variant="secondary",
+                size="sm",
+                elem_classes="explanation-btn",
+                visible=False
+            )
+        
         # 隐藏的组件用于复制和下载
         prompts_for_copy = gr.Textbox(visible=False)
         download_file = gr.File(
@@ -2418,6 +3736,48 @@ with gr.Blocks(
                 size="sm",
                 elem_classes="copy-btn"
             )
+            
+        # 分段编辑功能
+        with gr.Row():
+            enable_edit_btn = gr.Button(
+                "✏️ 启用分段编辑",
+                variant="secondary",
+                size="sm",
+                elem_classes="copy-btn",
+                visible=False
+            )
+            edit_history_btn = gr.Button(
+                "📜 查看编辑历史",
+                variant="secondary",
+                size="sm", 
+                elem_classes="copy-btn",
+                visible=False
+            )
+            reset_edit_btn = gr.Button(
+                "🔄 重置编辑",
+                variant="secondary",
+                size="sm",
+                elem_classes="copy-btn",
+                visible=False
+            )
+            
+        # 分段编辑界面
+        edit_interface = gr.HTML(
+            visible=False,
+            elem_id="edit_interface"
+        )
+        
+        # 编辑历史显示
+        edit_history_display = gr.Markdown(
+            visible=False,
+            elem_classes="edit-history"
+        )
+        
+        # 隐藏组件用于段落编辑
+        section_update_trigger = gr.Textbox(visible=False)
+        section_id_input = gr.Textbox(visible=False)
+        section_content_input = gr.Textbox(visible=False)
+        section_comment_input = gr.Textbox(visible=False)
             
         # 下载提示信息
         download_info = gr.HTML(
@@ -2505,6 +3865,33 @@ with gr.Blocks(
             visible=True
         )
     
+    # 优化按钮事件
+    optimize_btn.click(
+        fn=optimize_user_idea,
+        inputs=[idea_input],
+        outputs=[idea_input, optimization_result]
+    ).then(
+        fn=lambda: gr.update(visible=True),
+        outputs=[optimization_result]
+    )
+    
+    # 重置按钮事件
+    reset_btn.click(
+        fn=lambda: ("", gr.update(visible=False)),
+        outputs=[idea_input, optimization_result]
+    )
+    
+    # 处理过程说明按钮事件
+    show_explanation_btn.click(
+        fn=show_explanation,
+        outputs=[plan_output, process_explanation, hide_explanation_btn]
+    )
+    
+    hide_explanation_btn.click(
+        fn=hide_explanation,
+        outputs=[plan_output, process_explanation, hide_explanation_btn]
+    )
+    
     generate_btn.click(
         fn=generate_development_plan,
         inputs=[idea_input, reference_url_input],
@@ -2514,8 +3901,47 @@ with gr.Blocks(
         fn=lambda: gr.update(visible=True),
         outputs=[download_file]
     ).then(
+        fn=lambda: gr.update(visible=True),
+        outputs=[show_explanation_btn]
+    ).then(
+        fn=lambda: [gr.update(visible=True), gr.update(visible=True), gr.update(visible=True)],
+        outputs=[enable_edit_btn, edit_history_btn, reset_edit_btn]
+    ).then(
         fn=show_download_info,
         outputs=[download_info]
+    )
+    
+    # 分段编辑按钮事件
+    enable_edit_btn.click(
+        fn=enable_plan_editing,
+        inputs=[plan_output],
+        outputs=[edit_interface, edit_history_display]
+    ).then(
+        fn=lambda: [gr.update(visible=True), gr.update(visible=True)],
+        outputs=[edit_interface, edit_history_display]
+    )
+    
+    edit_history_btn.click(
+        fn=get_edit_history,
+        outputs=[edit_history_display]
+    ).then(
+        fn=lambda: gr.update(visible=True),
+        outputs=[edit_history_display]
+    )
+    
+    reset_edit_btn.click(
+        fn=reset_plan_edits,
+        outputs=[edit_history_display]
+    ).then(
+        fn=lambda: [gr.update(visible=False), gr.update(visible=False)],
+        outputs=[edit_interface, edit_history_display]
+    )
+    
+    # 段落更新事件（通过隐藏组件触发）
+    section_update_trigger.change(
+        fn=update_section_content,
+        inputs=[section_id_input, section_content_input, section_comment_input],
+        outputs=[plan_output]
     )
     
     # 复制按钮事件（使用JavaScript实现）

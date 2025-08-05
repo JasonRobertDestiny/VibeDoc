@@ -21,12 +21,12 @@ class MCPServiceConfig:
 class AIModelConfig:
     """AI模型配置"""
     provider: str = "siliconflow"
-    model_name: str = "Qwen/Qwen2.5-72B-Instruct"
+    model_name: str = "Qwen/Qwen3-235B-A22B-Thinking-2507"
     api_key: str = ""
     api_url: str = "https://api.siliconflow.cn/v1/chat/completions"
-    max_tokens: int = 4000
+    max_tokens: int = 8000
     temperature: float = 0.7
-    timeout: int = 120
+    timeout: int = 180
 
 class AppConfig:
     """应用总配置类"""
@@ -41,7 +41,7 @@ class AppConfig:
             api_key=os.getenv("SILICONFLOW_API_KEY", "")
         )
         
-        # MCP服务配置
+        # MCP服务配置 - 只保留核心服务
         self.mcp_services = {
             "deepwiki": MCPServiceConfig(
                 name="DeepWiki MCP",
@@ -54,19 +54,11 @@ class AppConfig:
                 url=os.getenv("FETCH_SSE_URL"),
                 timeout=int(os.getenv("MCP_TIMEOUT", "30")),
                 enabled=bool(os.getenv("FETCH_SSE_URL"))
-            ),
-            "doubao": MCPServiceConfig(
-                name="Doubao MCP",
-                url=os.getenv("DOUBAO_SSE_URL"),
-                api_key=os.getenv("DOUBAO_API_KEY"),
-                timeout=int(os.getenv("MCP_TIMEOUT", "30")),
-                enabled=bool(os.getenv("DOUBAO_SSE_URL") and os.getenv("DOUBAO_API_KEY"))
             )
         }
         
         # 应用功能配置
         self.features = {
-            "logo_generation": self.mcp_services["doubao"].enabled,
             "external_knowledge": any(service.enabled for service in self.mcp_services.values()),
             "multi_mcp_fusion": sum(service.enabled for service in self.mcp_services.values()) > 1
         }
@@ -159,17 +151,17 @@ EXAMPLE_CONFIGURATIONS = {
         ]
     },
     "triple_mcp": {
-        "description": "三MCP服务完整协作示例 - 保留一个区块链例子",
+        "description": "双MCP服务完整协作示例",
         "examples": [
             {
                 "idea": "构建数字藏品交易平台，集成NFT展示和社区功能",
                 "reference_url": "https://docs.deepwiki.org/blockchain/nft-marketplace",
-                "expected_services": ["deepwiki", "fetch", "doubao"]
+                "expected_services": ["deepwiki", "fetch"]
             },
             {
                 "idea": "创建智能教育助手，结合AI答疑和学习资源推荐",
                 "reference_url": "https://docs.deepwiki.org/ai/education-assistant",
-                "expected_services": ["deepwiki", "fetch", "doubao"]
+                "expected_services": ["deepwiki", "fetch"]
             }
         ]
     }

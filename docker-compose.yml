@@ -9,11 +9,9 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY}
+      - SILICON_FLOW_API_KEY=${SILICON_FLOW_API_KEY}
       - DEEPWIKI_SSE_URL=${DEEPWIKI_SSE_URL}
       - FETCH_SSE_URL=${FETCH_SSE_URL}
-      - DOUBAO_SSE_URL=${DOUBAO_SSE_URL}
-      - DOUBAO_API_KEY=${DOUBAO_API_KEY}
     env_file:
       - .env
     restart: unless-stopped

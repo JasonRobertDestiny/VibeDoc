@@ -22,7 +22,6 @@ class MCPServiceType(Enum):
     """MCP服务类型枚举"""
     DEEPWIKI = "deepwiki"
     FETCH = "fetch"
-    DOUBAO = "doubao"
 
 @dataclass
 class MCPCallResult:
@@ -284,13 +283,6 @@ class MCPServiceManager:
                     "url": url
                 }
             }
-        elif service_type == MCPServiceType.DOUBAO:
-            return {
-                "action": "analyze_url",
-                "params": {
-                    "url": url
-                }
-            }
         else:
             return {"url": url}
     
@@ -430,9 +422,7 @@ class MCPServiceManager:
         
         env_vars = {
             "DEEPWIKI_SSE_URL": os.getenv("DEEPWIKI_SSE_URL"),
-            "FETCH_SSE_URL": os.getenv("FETCH_SSE_URL"), 
-            "DOUBAO_SSE_URL": os.getenv("DOUBAO_SSE_URL"),
-            "DOUBAO_API_KEY": os.getenv("DOUBAO_API_KEY")
+            "FETCH_SSE_URL": os.getenv("FETCH_SSE_URL")
         }
         
         for var_name, var_value in env_vars.items():
