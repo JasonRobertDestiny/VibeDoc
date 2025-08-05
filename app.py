@@ -114,7 +114,7 @@ def get_mcp_status_display() -> str:
     """获取MCP服务状态显示 - 使用模块化管理器"""
     return mcp_manager.get_status_summary()
 
-def call_mcp_service(url: str, payload: Dict[str, Any], service_name: str, timeout: int = 30) -> Tuple[bool, str]:
+def call_mcp_service(url: str, payload: Dict[str, Any], service_name: str, timeout: int = 120) -> Tuple[bool, str]:
     """统一的MCP服务调用函数
     
     Args:
@@ -192,9 +192,14 @@ def fetch_external_knowledge(reference_url: str) -> str:
     
     # 验证URL是否可访问
     url = reference_url.strip()
+    logger.info(f"🔍 开始处理外部参考链接: {url}")
+    
     try:
         # 简单的HEAD请求检查URL是否存在
-        response = requests.head(url, timeout=5, allow_redirects=True)
+        logger.info(f"🌐 验证链接可访问性: {url}")
+        response = requests.head(url, timeout=10, allow_redirects=True)
+        logger.info(f"📡 链接验证结果: HTTP {response.status_code}")
+        
         if response.status_code >= 400:
             logger.warning(f"⚠️ 提供的URL不可访问: {url} (HTTP {response.status_code})")
             return f"""
@@ -211,6 +216,24 @@ def fetch_external_knowledge(reference_url: str) -> str:
 
 ---
 """
+        else:
+            logger.info(f"✅ 链接可访问，状态码: {response.status_code}")
+            
+    except requests.exceptions.Timeout:
+        logger.warning(f"⏰ URL验证超时: {url}")
+        return f"""
+## 🔗 参考链接处理说明
+
+**📍 提供的链接**: {url}
+
+**⏰ 处理状态**: 链接验证超时
+
+**🤖 AI处理**: 将基于创意内容进行智能分析，不依赖外部链接
+
+**💡 说明**: 为确保生成质量，AI会根据创意描述生成完整方案，避免引用不确定的外部内容
+
+---
+"""
     except Exception as e:
         logger.warning(f"⚠️ URL验证失败: {url} - {str(e)}")
         return f"""
@@ -218,7 +241,7 @@ def fetch_external_knowledge(reference_url: str) -> str:
 
 **📍 提供的链接**: {url}
 
-**🔍 处理状态**: 暂时无法验证链接可用性
+**🔍 处理状态**: 暂时无法验证链接可用性 ({str(e)[:100]})
 
 **🤖 AI处理**: 将基于创意内容进行智能分析，不依赖外部链接
 
@@ -228,13 +251,44 @@ def fetch_external_knowledge(reference_url: str) -> str:
 """
     
     # 尝试调用MCP服务
+    logger.info(f"🔄 尝试调用MCP服务获取知识...")
+    mcp_start_time = datetime.now()
     success, knowledge = mcp_manager.fetch_knowledge_from_url(url)
+    mcp_duration = (datetime.now() - mcp_start_time).total_seconds()
+    
+    logger.info(f"📊 MCP服务调用结果: 成功={success}, 内容长度={len(knowledge) if knowledge else 0}, 耗时={mcp_duration:.2f}秒")
     
     if success and knowledge and len(knowledge.strip()) > 50:
         # MCP服务成功返回有效内容
-        return knowledge
+        logger.info(f"✅ MCP服务成功获取知识，内容长度: {len(knowledge)} 字符")
+        
+        # 验证返回的内容是否包含实际知识而不是错误信息
+        if not any(keyword in knowledge.lower() for keyword in ['error', 'failed', '错误', '失败', '不可用']):
+            return f"""
+## 📚 外部知识库参考
+
+**🔗 来源链接**: {url}
+
+**✅ 获取状态**: MCP服务成功获取
+
+**📊 内容概览**: 已获取 {len(knowledge)} 字符的参考资料
+
+---
+
+{knowledge}
+
+---
+"""
+        else:
+            logger.warning(f"⚠️ MCP返回内容包含错误信息: {knowledge[:200]}")
     else:
         # MCP服务失败或返回无效内容，提供明确说明
+        logger.warning(f"⚠️ MCP服务调用失败或返回无效内容")
+        
+        # 详细诊断MCP服务状态
+        mcp_status = mcp_manager.get_status_summary()
+        logger.info(f"🔍 MCP服务状态详情: {mcp_status}")
+        
         return f"""
 ## 🔗 外部知识处理说明
 
@@ -242,13 +296,21 @@ def fetch_external_knowledge(reference_url: str) -> str:
 
 **🎯 处理方式**: 智能分析模式
 
-**💭 说明**: 当前外部知识服务暂时不可用，AI将基于以下方式生成方案：
+**� MCP服务状态**: 
+{mcp_status}
+
+**�💭 处理策略**: 当前外部知识服务暂时不可用，AI将基于以下方式生成方案：
 - ✅ 基于创意描述进行深度分析
 - ✅ 结合行业最佳实践
 - ✅ 提供完整的技术方案
 - ✅ 生成实用的编程提示词
 
 **🎉 优势**: 确保生成内容的准确性和可靠性，避免引用不确定的外部信息
+
+**🔧 技术细节**: 
+- MCP调用耗时: {mcp_duration:.2f}秒
+- 返回内容长度: {len(knowledge) if knowledge else 0} 字符
+- 服务状态: {'成功' if success else '失败'}
 
 ---
 """
@@ -366,18 +428,12 @@ def validate_and_fix_content(content: str) -> str:
     # 重新计算质量分数
     final_quality_score = calculate_quality_score(content)
     
-    # 添加质量报告（如果有显著改进）
+    # 移除质量报告显示，只记录日志
     if final_quality_score > initial_quality_score + 5:
         improvement = final_quality_score - initial_quality_score
-        quality_note = f"""
-> **📈 质量提升报告**  
-> 初始评分：{initial_quality_score}/100 → 优化后：{final_quality_score}/100 (提升{improvement}分)  
-> 应用修复：{', '.join(fixes_applied) if fixes_applied else '无需修复'}
-
----
-
-"""
-        content = quality_note + content
+        logger.info(f"📈 内容质量提升: {initial_quality_score}/100 → {final_quality_score}/100 (提升{improvement}分)")
+        if fixes_applied:
+            logger.info(f"🔧 应用修复: {', '.join(fixes_applied)}")
     
     logger.info(f"✅ 内容验证和修复完成，最终质量分数: {final_quality_score}/100")
     if fixes_applied:
@@ -470,8 +526,11 @@ def fix_mermaid_syntax(content: str) -> str:
         # 移除标题级别错误
         (r'\n##+ 🎯 ([A-Z])', r'\n    \1'),
         
-        # 修复中文节点名称的问题
-        (r'([A-Z]+)\[([^\]]*[^\x00-\x7F][^\]]*)\]', r'\1["⚡\2"]'),
+        # 修复中文节点名称的问题 - 彻底清理引号格式
+        (r'([A-Z]+)\["([^"]+)"\]', r'\1["\2"]'),  # 标准格式：A["文本"]
+        (r'([A-Z]+)\[""([^"]+)""\]', r'\1["\2"]'),  # 双引号错误：A[""文本""]
+        (r'([A-Z]+)\["⚡"([^"]+)""\]', r'\1["\2"]'),  # 带emoji错误
+        (r'([A-Z]+)\[([^\]]*[^\x00-\x7F][^\]]*)\]', r'\1["\2"]'),  # 中文无引号
         
         # 确保流程图语法正确
         (r'graph TB\n\s*graph', r'graph TB'),
@@ -492,31 +551,19 @@ def fix_mermaid_syntax(content: str) -> str:
     return content
 
 def enhance_mermaid_blocks(content: str) -> str:
-    """增强Mermaid代码块的渲染支持"""
+    """简化Mermaid代码块处理，避免渲染冲突"""
     import re
     
-    # 查找所有Mermaid代码块
+    # 查找所有Mermaid代码块并直接返回，不添加额外包装器
+    # 因为包装器可能导致渲染问题
     mermaid_pattern = r'```mermaid\n(.*?)\n```'
     
-    def enhance_mermaid_block(match):
+    def clean_mermaid_block(match):
         mermaid_content = match.group(1)
-        
-        # 为Mermaid块添加渲染ID和包装器
-        block_id = f"mermaid-{hash(mermaid_content) % 100000}"
-        
-        enhanced_block = f'''```mermaid
-{mermaid_content}
-```
-
-<div class="mermaid-wrapper" id="{block_id}">
-<div class="mermaid-render">
-{mermaid_content}
-</div>
-</div>'''
-        
-        return enhanced_block
+        # 直接返回清理过的Mermaid块
+        return f'```mermaid\n{mermaid_content}\n```'
     
-    content = re.sub(mermaid_pattern, enhance_mermaid_block, content, flags=re.DOTALL)
+    content = re.sub(mermaid_pattern, clean_mermaid_block, content, flags=re.DOTALL)
     
     return content
 
@@ -526,18 +573,31 @@ def validate_and_clean_links(content: str) -> str:
     
     # 检测并移除虚假链接模式
     fake_link_patterns = [
+        # Markdown链接格式
         r'\[([^\]]+)\]\(https?://blog\.csdn\.net/username/article/details/\d+\)',
         r'\[([^\]]+)\]\(https?://github\.com/username/[^\)]+\)',
         r'\[([^\]]+)\]\(https?://[^/]*example\.com[^\)]*\)',
         r'\[([^\]]+)\]\(https?://[^/]*xxx\.com[^\)]*\)',
         r'\[([^\]]+)\]\(https?://[^/]*test\.com[^\)]*\)',
         r'\[([^\]]+)\]\(https?://localhost[^\)]*\)',
+        
+        # 新增：更多虚假链接模式
+        r'\[([^\]]+)\]\(https?://medium\.com/@[^/]+/[^\)]*\d{9,}[^\)]*\)',  # Medium虚假文章
+        r'\[([^\]]+)\]\(https?://github\.com/[^/]+/[^/\)]*education[^\)]*\)',  # GitHub虚假教育项目
+        r'\[([^\]]+)\]\(https?://www\.kdnuggets\.com/\d{4}/\d{2}/[^\)]*\)',  # KDNuggets虚假文章
+        r'\[([^\]]+)\]\(https0://[^\)]+\)',  # 错误的协议
+        
+        # 纯URL格式
         r'https?://blog\.csdn\.net/username/article/details/\d+',
         r'https?://github\.com/username/[^\s\)]+',
         r'https?://[^/]*example\.com[^\s\)]*',
         r'https?://[^/]*xxx\.com[^\s\)]*',
         r'https?://[^/]*test\.com[^\s\)]*',
         r'https?://localhost[^\s\)]*',
+        r'https0://[^\s\)]+',  # 错误的协议
+        r'https?://medium\.com/@[^/]+/[^\s]*\d{9,}[^\s]*',
+        r'https?://github\.com/[^/]+/[^/\s]*education[^\s]*',
+        r'https?://www\.kdnuggets\.com/\d{4}/\d{2}/[^\s]*',
     ]
     
     for pattern in fake_link_patterns:
@@ -631,6 +691,11 @@ def fix_formatting_issues(content: str) -> str:
         (r'#### 🚀 第阶段：\*\*', r'#### 🚀 **第1阶段**：'),
         (r'### 📋 (\d+)\. \*\*第\d+阶段', r'### 📋 \1. **第\1阶段'),
         
+        # 修复表格格式问题
+        (r'\n## 🎯 \| ([^|]+) \| ([^|]+) \| ([^|]+) \|', r'\n| \1 | \2 | \3 |'),
+        (r'\n### 📋 (\d+)\. \*\*([^*]+)\*\*：', r'\n**\1. \2**：'),
+        (r'\n### 📋 (\d+)\. \*\*([^*]+)\*\*$', r'\n**\1. \2**'),
+        
         # 修复多余的空行
         (r'\n{4,}', r'\n\n\n'),
         
@@ -679,17 +744,19 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
     )
     
     if not is_valid:
-        return error_msg, "", ""
+        return error_msg, "", None
     
     # 步骤2: API密钥检查
+    api_check_start = datetime.now()
     if not API_KEY:
+        api_check_duration = (datetime.now() - api_check_start).total_seconds()
         explanation_manager.add_processing_step(
             stage=ProcessingStage.AI_GENERATION,
             title="API密钥检查",
             description="检查AI模型API密钥配置",
             success=False,
             details={"错误": "API密钥未配置"},
-            duration=0.0,
+            duration=api_check_duration,
             quality_score=0,
             evidence="系统环境变量中未找到SILICONFLOW_API_KEY"
         )
@@ -720,7 +787,7 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
 
 **💡 提示**：API密钥是必填项，没有它就无法调用AI服务生成开发计划。
 """
-        return error_msg, "", ""
+        return error_msg, "", None
     
     # 步骤3: 获取外部知识库内容
     knowledge_start = datetime.now()
@@ -764,18 +831,24 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
 4. 必须在相关章节中使用"参考XXX建议"等表述
 5. 开发阶段必须有明确编号（第1阶段、第2阶段等）
 
-🚫 严禁行为（重要）：
-- **绝对不要编造虚假的链接或参考资料**
-- **不要生成不存在的URL（如 xxx.com、example.com、username等占位符）**
-- **不要创建虚假的GitHub仓库链接（如 github.com/username/项目名）**
-- **不要引用不存在的CSDN博客文章（如 blog.csdn.net/username/article/details/123456789）**
-- **不要使用 "参考1"、"参考2" 等编号来标注虚假链接**
+🚫 严禁行为（严格执行）：
+- **绝对不要编造任何虚假的链接或参考资料**
+- **禁止生成任何不存在的URL，包括但不限于：**
+  - ❌ https://medium.com/@username/... (用户名+数字ID格式)
+  - ❌ https://github.com/username/... (占位符用户名)
+  - ❌ https://blog.csdn.net/username/... 
+  - ❌ https://www.kdnuggets.com/年份/月份/... (虚构文章)
+  - ❌ https://example.com, xxx.com, test.com 等测试域名
+  - ❌ 任何以https0://开头的错误协议链接
+- **不要在"参考来源"部分添加任何链接，除非用户明确提供**
+- **不要使用"参考文献"、"延伸阅读"等标题添加虚假链接**
 
 ✅ 正确做法：
-- 如果没有提供外部参考，直接基于创意进行分析
-- 只引用用户实际提供的参考链接
+- 如果没有提供外部参考，**完全省略"参考来源"部分**
+- 只引用用户实际提供的参考链接（如果有的话）
 - 当外部知识不可用时，明确说明是基于最佳实践生成
-- 使用 "基于行业标准"、"参考常见架构" 等表述，而不是虚假链接
+- 使用 "基于行业标准"、"参考常见架构"、"遵循最佳实践" 等表述
+- **开发计划应直接开始，不要虚构任何外部资源**
 
 📊 视觉化内容要求（新增）：
 - 必须在技术方案中包含架构图的Mermaid代码
@@ -785,6 +858,13 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
 - 必须包含项目里程碑时间表
 
 🎯 Mermaid图表格式要求（严格遵循）：
+
+⚠️ **严格禁止错误格式**：
+- ❌ 绝对不要使用 `A[""文本""]` 格式（双重引号）
+- ❌ 绝对不要使用 `## 🎯` 等标题在图表内部
+- ❌ 绝对不要在节点名称中使用emoji符号
+
+✅ **正确的Mermaid语法**：
 
 **架构图示例**：
 ```mermaid
@@ -905,52 +985,194 @@ gantt
 确保提示词具体、可操作，能直接用于AI编程工具。"""
 
     try:
-        logger.info("Calling AI API for development plan generation...")
+        logger.info("🚀 开始调用AI API生成开发计划...")
+        
+        # 步骤3: AI生成准备
+        ai_prep_start = datetime.now()
+        
+        # 构建请求数据
+        request_data = {
+            "model": "Qwen/Qwen2.5-72B-Instruct",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "max_tokens": 4096,  # 修复：API限制最大4096 tokens
+            "temperature": 0.7
+        }
+        
+        ai_prep_duration = (datetime.now() - ai_prep_start).total_seconds()
+        
+        explanation_manager.add_processing_step(
+            stage=ProcessingStage.AI_GENERATION,
+            title="AI请求准备",
+            description="构建AI模型请求参数和提示词",
+            success=True,
+            details={
+                "AI模型": request_data['model'],
+                "系统提示词长度": f"{len(system_prompt)} 字符",
+                "用户提示词长度": f"{len(user_prompt)} 字符",
+                "最大Token数": request_data['max_tokens'],
+                "温度参数": request_data['temperature']
+            },
+            duration=ai_prep_duration,
+            quality_score=95,
+            evidence=f"准备调用 {request_data['model']} 模型，提示词总长度: {len(system_prompt + user_prompt)} 字符"
+        )
+        
+        # 记录请求信息（不包含完整提示词以避免日志过长）
+        logger.info(f"📊 API请求模型: {request_data['model']}")
+        logger.info(f"📏 系统提示词长度: {len(system_prompt)} 字符")
+        logger.info(f"📏 用户提示词长度: {len(user_prompt)} 字符")
+        
+        # 步骤4: AI API调用
+        api_call_start = datetime.now()
+        logger.info(f"🌐 正在调用API: {API_URL}")
         
         response = requests.post(
             API_URL,
             headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-            json={
-                "model": "Qwen/Qwen3-235B-A22B-Thinking-2507",
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                "max_tokens": 8000,  # 增加token限制
-                "temperature": 0.7
-            },
-            timeout=180  # 优化：生成方案超时时间为180秒
+            json=request_data,
+            timeout=300  # 优化：生成方案超时时间为300秒（5分钟）
         )
+        
+        api_call_duration = (datetime.now() - api_call_start).total_seconds()
+        
+        logger.info(f"📈 API响应状态码: {response.status_code}")
+        logger.info(f"⏱️ API调用耗时: {api_call_duration:.2f}秒")
         
         if response.status_code == 200:
             content = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+            
+            content_length = len(content) if content else 0
+            logger.info(f"📝 生成内容长度: {content_length} 字符")
+            
+            explanation_manager.add_processing_step(
+                stage=ProcessingStage.AI_GENERATION,
+                title="AI内容生成",
+                description="AI模型成功生成开发计划内容",
+                success=bool(content),
+                details={
+                    "响应状态": f"HTTP {response.status_code}",
+                    "生成内容长度": f"{content_length} 字符",
+                    "API调用耗时": f"{api_call_duration:.2f}秒",
+                    "平均生成速度": f"{content_length / api_call_duration:.1f} 字符/秒" if api_call_duration > 0 else "N/A"
+                },
+                duration=api_call_duration,
+                quality_score=90 if content_length > 1000 else 70,
+                evidence=f"成功生成 {content_length} 字符的开发计划内容，包含技术方案和编程提示词"
+            )
+            
             if content:
+                # 步骤5: 内容后处理
+                postprocess_start = datetime.now()
+                
                 # 后处理：确保内容结构化
                 final_plan_text = format_response(content)
                 
                 # 应用内容验证和修复
                 final_plan_text = validate_and_fix_content(final_plan_text)
                 
+                postprocess_duration = (datetime.now() - postprocess_start).total_seconds()
+                
+                explanation_manager.add_processing_step(
+                    stage=ProcessingStage.CONTENT_FORMATTING,
+                    title="内容后处理",
+                    description="格式化和验证生成的内容",
+                    success=True,
+                    details={
+                        "格式化处理": "Markdown结构优化",
+                        "内容验证": "Mermaid语法修复, 链接检查",
+                        "最终内容长度": f"{len(final_plan_text)} 字符",
+                        "处理耗时": f"{postprocess_duration:.2f}秒"
+                    },
+                    duration=postprocess_duration,
+                    quality_score=85,
+                    evidence=f"完成内容后处理，最终输出 {len(final_plan_text)} 字符的完整开发计划"
+                )
+                
                 # 创建临时文件
                 temp_file = create_temp_markdown_file(final_plan_text)
                 
+                # 如果临时文件创建失败，使用None避免Gradio权限错误
+                if not temp_file:
+                    temp_file = None
+                
+                # 总处理时间
+                total_duration = (datetime.now() - start_time).total_seconds()
+                logger.info(f"🎉 开发计划生成完成，总耗时: {total_duration:.2f}秒")
+                
                 return final_plan_text, extract_prompts_section(final_plan_text), temp_file
             else:
+                explanation_manager.add_processing_step(
+                    stage=ProcessingStage.AI_GENERATION,
+                    title="AI生成失败",
+                    description="AI模型返回空内容",
+                    success=False,
+                    details={
+                        "响应状态": f"HTTP {response.status_code}",
+                        "错误原因": "AI返回空内容"
+                    },
+                    duration=api_call_duration,
+                    quality_score=0,
+                    evidence="AI API调用成功但返回空的内容"
+                )
+                
                 logger.error("API returned empty content")
-                return "❌ API返回空内容", "", ""
+                return "❌ AI返回空内容，请稍后重试", "", None
         else:
+            # 记录详细的错误信息
             logger.error(f"API request failed with status {response.status_code}")
-            return f"❌ API请求失败: HTTP {response.status_code}", "", ""
+            try:
+                error_detail = response.json()
+                logger.error(f"API错误详情: {error_detail}")
+                error_message = error_detail.get('message', '未知错误')
+                error_code = error_detail.get('code', '')
+                
+                explanation_manager.add_processing_step(
+                    stage=ProcessingStage.AI_GENERATION,
+                    title="AI API调用失败",
+                    description="AI模型API请求失败",
+                    success=False,
+                    details={
+                        "HTTP状态码": response.status_code,
+                        "错误代码": error_code,
+                        "错误消息": error_message
+                    },
+                    duration=api_call_duration,
+                    quality_score=0,
+                    evidence=f"API返回错误: HTTP {response.status_code} - {error_message}"
+                )
+                
+                return f"❌ API请求失败: HTTP {response.status_code} (错误代码: {error_code}) - {error_message}", "", None
+            except:
+                logger.error(f"API响应内容: {response.text[:500]}")
+                
+                explanation_manager.add_processing_step(
+                    stage=ProcessingStage.AI_GENERATION,
+                    title="AI API调用失败",
+                    description="AI模型API请求失败，无法解析错误信息",
+                    success=False,
+                    details={
+                        "HTTP状态码": response.status_code,
+                        "响应内容": response.text[:200]
+                    },
+                    duration=api_call_duration,
+                    quality_score=0,
+                    evidence=f"API请求失败，状态码: {response.status_code}"
+                )
+                
+                return f"❌ API请求失败: HTTP {response.status_code} - {response.text[:200]}", "", None
             
     except requests.exceptions.Timeout:
         logger.error("API request timeout")
-        return "❌ API请求超时，请稍后重试", "", ""
+        return "❌ API请求超时，请稍后重试", "", None
     except requests.exceptions.ConnectionError:
         logger.error("API connection failed")
-        return "❌ 网络连接失败，请检查网络设置", "", ""
+        return "❌ 网络连接失败，请检查网络设置", "", None
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
-        return f"❌ 处理错误: {str(e)}", "", ""
+        return f"❌ 处理错误: {str(e)}", "", None
 
 def extract_prompts_section(content: str) -> str:
     """从完整内容中提取AI编程提示词部分"""
@@ -969,13 +1191,32 @@ def extract_prompts_section(content: str) -> str:
 def create_temp_markdown_file(content: str) -> str:
     """创建临时markdown文件"""
     try:
-        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8')
-        temp_file.write(content)
-        temp_file.close()
-        logger.info(f"Created temporary file: {temp_file.name}")
-        return temp_file.name
+        import tempfile
+        import os
+        
+        # 创建临时文件，使用更安全的方法
+        with tempfile.NamedTemporaryFile(
+            mode='w', 
+            suffix='.md', 
+            delete=False, 
+            encoding='utf-8'
+        ) as temp_file:
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+        
+        # 验证文件是否创建成功
+        if os.path.exists(temp_file_path):
+            logger.info(f"✅ 成功创建临时文件: {temp_file_path}")
+            return temp_file_path
+        else:
+            logger.warning("⚠️ 临时文件创建后不存在")
+            return ""
+            
+    except PermissionError as e:
+        logger.error(f"❌ 权限错误，无法创建临时文件: {e}")
+        return ""
     except Exception as e:
-        logger.error(f"Failed to create temporary file: {e}")
+        logger.error(f"❌ 创建临时文件失败: {e}")
         return ""
 
 def enable_plan_editing(plan_content: str) -> Tuple[str, str]:
@@ -1435,12 +1676,10 @@ def format_response(content: str) -> str:
     return formatted_content
 
 def enhance_prompts_display(prompts_content: str) -> str:
-    """美化AI编程提示词显示，为每个提示词添加复制按钮"""
+    """简化AI编程提示词显示"""
     lines = prompts_content.split('\n')
     enhanced_lines = []
     in_code_block = False
-    current_prompt_id = 0
-    current_prompt_content = ""
     
     for line in lines:
         stripped = line.strip()
@@ -1452,74 +1691,38 @@ def enhance_prompts_display(prompts_content: str) -> str:
             enhanced_lines.append('')
             enhanced_lines.append('# 🤖 AI编程助手提示词')
             enhanced_lines.append('')
-            enhanced_lines.append('> 💡 **使用说明**：以下提示词基于您的项目需求定制生成，可直接复制到 Claude Code、GitHub Copilot、ChatGPT 等AI编程工具中使用')
+            enhanced_lines.append('> 💡 **使用说明**：以下提示词基于您的项目需求定制生成，可直接复制到 GitHub Copilot、ChatGPT、Claude 等AI编程工具中使用')
             enhanced_lines.append('')
             continue
             
         # 处理二级标题（功能模块）
         if stripped.startswith('## ') and not in_code_block:
             title = stripped[3:].strip()
-            current_prompt_id += 1
             enhanced_lines.append('')
-            enhanced_lines.append('<div class="prompt-section">')
-            enhanced_lines.append('')
-            enhanced_lines.append(f'## 🎯 {title}')
+            enhanced_lines.append(f'### 🎯 {title}')
             enhanced_lines.append('')
             continue
             
         # 处理代码块开始
         if stripped.startswith('```') and not in_code_block:
             in_code_block = True
-            current_prompt_content = ""  # 开始收集提示词内容
             enhanced_lines.append('')
-            enhanced_lines.append('<div class="prompt-code-block">')
-            enhanced_lines.append('')
-            enhanced_lines.append('```prompt')
-            continue
-            
-        # 处理代码块内容
-        if in_code_block and not stripped.startswith('```'):
-            current_prompt_content += line + '\n'
-            enhanced_lines.append(line)
+            enhanced_lines.append('```')
             continue
             
         # 处理代码块结束
         if stripped.startswith('```') and in_code_block:
             in_code_block = False
-            # 添加复制按钮
-            clean_prompt = current_prompt_content.strip()
-            # 安全地编码内容，避免JavaScript注入
-            import html
-            encoded_prompt = html.escape(clean_prompt).replace('\n', '\\n').replace("'", "\\'")
-            
             enhanced_lines.append('```')
             enhanced_lines.append('')
-            enhanced_lines.append('<div class="prompt-copy-section">')
-            enhanced_lines.append(f'<button class="individual-copy-btn" data-prompt-id="{current_prompt_id}" data-prompt-content="{encoded_prompt}">')
-            enhanced_lines.append('    📋 复制此提示词')
-            enhanced_lines.append('</button>')
-            enhanced_lines.append(f'<button class="edit-prompt-btn" data-prompt-id="{current_prompt_id}" data-prompt-content="{encoded_prompt}">')
-            enhanced_lines.append('    ✏️ 编辑提示词')
-            enhanced_lines.append('</button>')
-            enhanced_lines.append('<span class="copy-success-msg" id="copy-success-' + str(current_prompt_id) + '" style="display: none; color: #28a745; margin-left: 10px;">✅ 已复制!</span>')
-            enhanced_lines.append('</div>')
-            enhanced_lines.append('')
-            enhanced_lines.append('</div>')
-            enhanced_lines.append('')
-            enhanced_lines.append('</div>')
-            enhanced_lines.append('')
-            current_prompt_content = ""
             continue
             
-        # 其他内容保持原样
+        # 其他内容直接添加
         enhanced_lines.append(line)
     
-    # 如果还在代码块中，需要关闭
-    if in_code_block:
-        enhanced_lines.extend(['```', '', '</div>', '', '</div>'])
-    
-    # 关闭主容器
-    enhanced_lines.extend(['', '</div>', ''])
+    # 结束高亮区域
+    enhanced_lines.append('')
+    enhanced_lines.append('</div>')
     
     return '\n'.join(enhanced_lines)
 
@@ -3745,48 +3948,6 @@ with gr.Blocks(
                 elem_classes="copy-btn"
             )
             
-        # 分段编辑功能
-        with gr.Row():
-            enable_edit_btn = gr.Button(
-                "✏️ 启用分段编辑",
-                variant="secondary",
-                size="sm",
-                elem_classes="copy-btn",
-                visible=False
-            )
-            edit_history_btn = gr.Button(
-                "📜 查看编辑历史",
-                variant="secondary",
-                size="sm", 
-                elem_classes="copy-btn",
-                visible=False
-            )
-            reset_edit_btn = gr.Button(
-                "🔄 重置编辑",
-                variant="secondary",
-                size="sm",
-                elem_classes="copy-btn",
-                visible=False
-            )
-            
-        # 分段编辑界面
-        edit_interface = gr.HTML(
-            visible=False,
-            elem_id="edit_interface"
-        )
-        
-        # 编辑历史显示
-        edit_history_display = gr.Markdown(
-            visible=False,
-            elem_classes="edit-history"
-        )
-        
-        # 隐藏组件用于段落编辑
-        section_update_trigger = gr.Textbox(visible=False)
-        section_id_input = gr.Textbox(visible=False)
-        section_content_input = gr.Textbox(visible=False)
-        section_comment_input = gr.Textbox(visible=False)
-            
         # 下载提示信息
         download_info = gr.HTML(
             value="",
@@ -3926,44 +4087,8 @@ with gr.Blocks(
         fn=lambda: gr.update(visible=True),
         outputs=[show_explanation_btn]
     ).then(
-        fn=lambda: [gr.update(visible=True), gr.update(visible=True), gr.update(visible=True)],
-        outputs=[enable_edit_btn, edit_history_btn, reset_edit_btn]
-    ).then(
         fn=show_download_info,
         outputs=[download_info]
-    )
-    
-    # 分段编辑按钮事件
-    enable_edit_btn.click(
-        fn=enable_plan_editing,
-        inputs=[plan_output],
-        outputs=[edit_interface, edit_history_display]
-    ).then(
-        fn=lambda: [gr.update(visible=True), gr.update(visible=True)],
-        outputs=[edit_interface, edit_history_display]
-    )
-    
-    edit_history_btn.click(
-        fn=get_edit_history,
-        outputs=[edit_history_display]
-    ).then(
-        fn=lambda: gr.update(visible=True),
-        outputs=[edit_history_display]
-    )
-    
-    reset_edit_btn.click(
-        fn=reset_plan_edits,
-        outputs=[edit_history_display]
-    ).then(
-        fn=lambda: [gr.update(visible=False), gr.update(visible=False)],
-        outputs=[edit_interface, edit_history_display]
-    )
-    
-    # 段落更新事件（通过隐藏组件触发）
-    section_update_trigger.change(
-        fn=update_section_content,
-        inputs=[section_id_input, section_content_input, section_comment_input],
-        outputs=[plan_output]
     )
     
     # 复制按钮事件（使用JavaScript实现）

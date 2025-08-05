@@ -17,10 +17,12 @@ deployment_check.py
 
 # 结果文件
 result*.txt
+result*.md
 *.log
 vlog.log
 
 # 临时文件
+tmp*.md
 *_backup.py
 *_optimized.py
 *.tmp
@@ -29,6 +31,7 @@ vlog.log
 # 开发文档
 develop.md
 OPTIMIZATION_*.md
+CLAUDE.md
 ui_enhancements.html
 
 # 配置文件

@@ -25,12 +25,12 @@ class MCPServiceConfig:
 class AIModelConfig:
     """AI模型配置"""
     provider: str = "siliconflow"
-    model_name: str = "Qwen/Qwen3-235B-A22B-Thinking-2507"
+    model_name: str = "Qwen/Qwen2.5-72B-Instruct"
     api_key: str = ""
     api_url: str = "https://api.siliconflow.cn/v1/chat/completions"
     max_tokens: int = 8000
     temperature: float = 0.7
-    timeout: int = 180
+    timeout: int = 300  # 增加到300秒（5分钟）解决超时问题
 
 class AppConfig:
     """应用总配置类"""
@@ -43,22 +43,25 @@ class AppConfig:
         # AI模型配置
         self.ai_model = AIModelConfig(
             api_key=os.getenv("SILICONFLOW_API_KEY", ""),
-            timeout=int(os.getenv("API_TIMEOUT", "180"))  # AI生成超时设为180秒
+            timeout=int(os.getenv("API_TIMEOUT", "300"))  # AI生成超时设为300秒（5分钟）
         )
         
-        # MCP服务配置 - 更新为托管服务地址
+        # MCP服务配置 - 提供默认服务说明
+        deepwiki_url = os.getenv("DEEPWIKI_MCP_URL")
+        fetch_url = os.getenv("FETCH_MCP_URL")
+        
         self.mcp_services = {
             "deepwiki": MCPServiceConfig(
                 name="DeepWiki MCP",
-                url=os.getenv("DEEPWIKI_MCP_URL"),  # 修正环境变量名
-                timeout=int(os.getenv("MCP_TIMEOUT", "60")),  # MCP超时改为60秒
-                enabled=bool(os.getenv("DEEPWIKI_MCP_URL"))
+                url=deepwiki_url,
+                timeout=int(os.getenv("MCP_TIMEOUT", "120")),
+                enabled=bool(deepwiki_url)  # 只有URL存在才启用
             ),
             "fetch": MCPServiceConfig(
-                name="Fetch MCP",
-                url=os.getenv("FETCH_MCP_URL"),  # 修正环境变量名
-                timeout=int(os.getenv("MCP_TIMEOUT", "60")),  # MCP超时改为60秒
-                enabled=bool(os.getenv("FETCH_MCP_URL"))
+                name="Fetch MCP", 
+                url=fetch_url,
+                timeout=int(os.getenv("MCP_TIMEOUT", "120")),
+                enabled=bool(fetch_url)  # 只有URL存在才启用
             )
         }
         

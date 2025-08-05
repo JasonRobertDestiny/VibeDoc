@@ -362,6 +362,26 @@ class MCPServiceManager:
     def get_status_summary(self) -> str:
         """获取状态摘要HTML"""
         status = self.get_health_status()
+        enabled_services = sum(1 for info in status.values() if info["enabled"])
+        healthy_services = sum(1 for info in status.values() if info["status"] == "healthy")
+        
+        if enabled_services == 0:
+            return """
+🔍 MCP服务状态监控
+
+**📊 服务概览**: 当前未配置MCP服务
+
+**⚙️ 配置说明**:
+- DeepWiki MCP: 需要设置 `DEEPWIKI_MCP_URL` 环境变量
+- Fetch MCP: 需要设置 `FETCH_MCP_URL` 环境变量
+
+**🎯 当前模式**: 纯AI生成模式
+- 基于行业最佳实践
+- 结合项目创意分析
+- 生成专业技术方案
+
+总计: 0/2 个服务可用
+"""
         
         status_html = """
         <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin: 15px 0;">
@@ -400,12 +420,9 @@ class MCPServiceManager:
             </div>
             """
         
-        available_count = sum(1 for info in status.values() if info["status"] == "healthy")
-        total_count = sum(1 for info in status.values() if info["enabled"])
-        
         status_html += f"""
             <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
-                <span style="color: #4a5568;">总计: {available_count}/{total_count} 个服务可用</span>
+                <span style="color: #4a5568;">总计: {healthy_services}/{enabled_services} 个服务可用</span>
             </div>
         </div>
         """

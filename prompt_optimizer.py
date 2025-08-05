@@ -106,7 +106,7 @@ class PromptOptimizer:
                 self.api_url,
                 headers=headers,
                 json=payload,
-                timeout=180  # 优化：创意描述优化超时时间为180秒
+                timeout=300  # 优化：创意描述优化超时时间为300秒（5分钟）
             )
             
             if response.status_code == 200:
