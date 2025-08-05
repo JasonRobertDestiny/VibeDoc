@@ -1,0 +1,33 @@
+# VibeDoc Agent应用核心依赖
+# 针对MCP&Agent挑战赛2025优化的依赖包
+
+# 🔧 核心框架
+gradio==5.34.1              # Agent界面框架 - 为用户提供直观的Agent交互体验
+requests>=2.31.0            # HTTP请求 - 用于MCP服务通信
+urllib3>=1.26.0
+certifi>=2022.12.7
+
+# 🤖 Agent配置管理  
+python-dotenv>=0.19.0
+pydantic>=1.10.0
+typing-extensions>=4.4.0
+
+# 📊 Agent异步处理
+aiofiles>=22.0
+anyio>=3.0
+
+# 🚀 Agent应用服务器
+fastapi>=0.115.2
+uvicorn>=0.14.0
+
+# 📝 Agent内容处理
+markdown>=3.8.2             # Markdown处理 - Agent生成内容的格式化
+
+# 📋 多格式导出支持
+python-docx>=1.2.0          # Word文档导出
+reportlab>=4.4.3            # PDF生成支持
+html2text>=2024.4.24        # HTML转换
+
+# Agent容器化支持 (可选)
+# weasyprint>=57.0  # 需要额外系统依赖
+# zipfile36>=0.1.3  # Python 3.6+ 内置支持
