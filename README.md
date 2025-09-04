@@ -4,7 +4,7 @@
 [![Qwen2.5-72B-Instruct](https://img.shields.io/badge/AI-Qwen2.5--72B--Instruct-green)](https://siliconflow.cn)
 [![Agent应用](https://img.shields.io/badge/类型-Agent应用-orange)](https://github.com/)
 
-> **30秒将创意转化为完整开发方案 + 专业编程提示词**  
+> **60-180秒将创意转化为完整开发方案 + 专业编程提示词**  
 > AI驱动的智能开发计划生成器，集成多MCP服务协作的Agent应用
 
 ## 🎯 项目特色
@@ -95,7 +95,7 @@ export FETCH_MCP_URL="https://mcp.api-inference.modelscope.net/6ec508e067dc41/ss
 
 | 痛点 | 传统方式 | VibeDoc Agent解决方案 |
 |------|----------|----------------------|
-| 📋 项目规划耗时 | 2-3天制定方案 | 30秒AI生成 |
+| 📋 项目规划耗时 | 2-3天制定方案 | 60-180秒AI生成 |
 | 🤔 技术选型困难 | 需要大量调研 | 智能推荐最佳方案 |
 | 📖 文档编写复杂 | 手动编写，格式混乱 | 结构化专业文档 |
 | 🔧 提示词编写门槛高 | 需要专业知识 | 自动生成专业提示词 |
@@ -105,7 +105,7 @@ export FETCH_MCP_URL="https://mcp.api-inference.modelscope.net/6ec508e067dc41/ss
 #### 🌟 **场景价值 (30%)**
 - **真实需求**：开发者日常工作中的刚需场景
 - **实用性强**：生成的方案可直接用于项目开发
-- **效率提升**：将3天工作量压缩到30秒
+- **效率提升**：将3天工作量压缩到60-180秒
 - **专业性**：输出符合行业标准的专业文档
 
 #### 🔗 **MCP集成深度 (30%)**
