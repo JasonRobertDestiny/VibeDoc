@@ -262,8 +262,14 @@ def fetch_external_knowledge(reference_url: str) -> str:
         # MCP服务成功返回有效内容
         logger.info(f"✅ MCP服务成功获取知识，内容长度: {len(knowledge)} 字符")
         
-        # 验证返回的内容是否包含实际知识而不是错误信息
-        if not any(keyword in knowledge.lower() for keyword in ['error', 'failed', '错误', '失败', '不可用']):
+        # 验证返回的内容是否包含实际知识而不是明显的错误信息
+        error_indicators = ['An error occurred', 'Connection failed', 'Request failed', 'Invalid response', '服务器错误', '连接失败', '请求失败']
+        has_error = any(indicator in knowledge for indicator in error_indicators)
+        
+        # 检查是否有足够的实际内容（排除明显的错误消息）
+        content_length_sufficient = len(knowledge.strip()) > 100
+        
+        if not has_error and content_length_sufficient:
             return f"""
 ## 📚 外部知识库参考
 
@@ -280,7 +286,7 @@ def fetch_external_knowledge(reference_url: str) -> str:
 ---
 """
         else:
-            logger.warning(f"⚠️ MCP返回内容包含错误信息: {knowledge[:200]}")
+            logger.warning(f"⚠️ MCP返回内容质量不符合要求: {knowledge[:200]}")
     else:
         # MCP服务失败或返回无效内容，提供明确说明
         logger.warning(f"⚠️ MCP服务调用失败或返回无效内容")
@@ -528,9 +534,9 @@ def fix_mermaid_syntax(content: str) -> str:
         
         # 修复中文节点名称的问题 - 彻底清理引号格式
         (r'([A-Z]+)\["([^"]+)"\]', r'\1["\2"]'),  # 标准格式：A["文本"]
-        (r'([A-Z]+)\[""([^"]+)""\]', r'\1["\2"]'),  # 双引号错误：A[""文本""]
+        (r'([A-Z]+)\[""([^"]+)""\]', r'\1[\2]'),  # 双引号错误：A[""文本""] -> A[文本]
         (r'([A-Z]+)\["⚡"([^"]+)""\]', r'\1["\2"]'),  # 带emoji错误
-        (r'([A-Z]+)\[([^\]]*[^\x00-\x7F][^\]]*)\]', r'\1["\2"]'),  # 中文无引号
+        (r'([A-Z]+)\[([^\]]*[^\x00-\x7F][^\]]*)\]', r'\1[\2]'),  # 中文无引号，保持简单格式
         
         # 确保流程图语法正确
         (r'graph TB\n\s*graph', r'graph TB'),
@@ -806,7 +812,7 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
         },
         duration=knowledge_duration,
         quality_score=80 if retrieved_knowledge else 50,
-        evidence=f"获取的知识内容: '{retrieved_knowledge[:100]}...' (长度: {len(retrieved_knowledge) if retrieved_knowledge else 0}字符)"
+        evidence=f"获取的知识内容: '{(retrieved_knowledge[:100] + '...') if retrieved_knowledge else '无'}' (长度: {len(retrieved_knowledge) if retrieved_knowledge else 0}字符)"
     )
     
     # 获取当前日期并计算项目开始日期
