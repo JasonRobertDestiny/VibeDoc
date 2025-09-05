@@ -197,7 +197,7 @@ def fetch_external_knowledge(reference_url: str) -> str:
     try:
         # 简单的HEAD请求检查URL是否存在
         logger.info(f"🌐 验证链接可访问性: {url}")
-        response = requests.head(url, timeout=10, allow_redirects=True)
+        response = requests.head(url, timeout=20, allow_redirects=True)
         logger.info(f"📡 链接验证结果: HTTP {response.status_code}")
         
         if response.status_code >= 400:
@@ -220,35 +220,12 @@ def fetch_external_knowledge(reference_url: str) -> str:
             logger.info(f"✅ 链接可访问，状态码: {response.status_code}")
             
     except requests.exceptions.Timeout:
-        logger.warning(f"⏰ URL验证超时: {url}")
-        return f"""
-## 🔗 参考链接处理说明
-
-**📍 提供的链接**: {url}
-
-**⏰ 处理状态**: 链接验证超时
-
-**🤖 AI处理**: 将基于创意内容进行智能分析，不依赖外部链接
-
-**💡 说明**: 为确保生成质量，AI会根据创意描述生成完整方案，避免引用不确定的外部内容
-
----
-"""
+        logger.warning(f"⏰ URL验证超时: {url}，但仍然尝试MCP服务")
+        # 不要返回，继续尝试MCP服务
+        
     except Exception as e:
-        logger.warning(f"⚠️ URL验证失败: {url} - {str(e)}")
-        return f"""
-## 🔗 参考链接处理说明
-
-**📍 提供的链接**: {url}
-
-**🔍 处理状态**: 暂时无法验证链接可用性 ({str(e)[:100]})
-
-**🤖 AI处理**: 将基于创意内容进行智能分析，不依赖外部链接
-
-**💡 说明**: 为确保生成质量，AI会根据创意描述生成完整方案，避免引用不确定的外部内容
-
----
-"""
+        logger.warning(f"⚠️ URL验证失败: {url} - {str(e)}，但仍然尝试MCP服务")
+        # 不要返回，继续尝试MCP服务
     
     # 尝试调用MCP服务
     logger.info(f"🔄 尝试调用MCP服务获取知识...")

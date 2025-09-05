@@ -164,7 +164,8 @@ class MCPServiceManager:
             # 如果是教育、健康、金融等相关项目，也调用DeepWiki
             if any(keyword in url_lower for keyword in [
                 "education", "health", "finance", "learning", "medical", 
-                "investment", "fitness", "diet", "blockchain", "web3"
+                "investment", "fitness", "diet", "blockchain", "web3",
+                "ethereum", "solidity", "smart-contract", "defi", "nft"
             ]):
                 services.append(MCPServiceType.DEEPWIKI)
         
