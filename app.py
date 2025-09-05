@@ -31,6 +31,15 @@ API_URL = config.ai_model.api_url
 
 # 应用启动时的初始化
 logger.info("🚀 VibeDoc Agent应用启动")
+
+# 检测ModelSpace环境
+is_modelspace = os.getenv('MODELSCOPE_ENVIRONMENT') or os.getenv('SPACE_ID')
+if is_modelspace:
+    logger.info("🏠 检测到ModelSpace环境，应用特殊配置")
+    # ModelSpace环境下的特殊处理
+    os.environ.setdefault('ENVIRONMENT', 'production')
+    os.environ.setdefault('PORT', '7860')
+
 logger.info(f"📊 配置摘要: {json.dumps(config.get_config_summary(), ensure_ascii=False, indent=2)}")
 
 # 验证配置
