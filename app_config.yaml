@@ -1,0 +1,18 @@
+title: VibeDoc Agent - AI开发计划生成器
+emoji: 🚀
+colorFrom: blue
+colorTo: purple
+sdk: gradio
+sdk_version: 4.44.0
+app_file: app.py
+pinned: false
+license: mit
+models:
+- Qwen/Qwen2.5-72B-Instruct
+tags:
+- ai-agent
+- mcp
+- development-plan
+- model-context-protocol
+- gradio
+short_description: AI开发计划生成器，集成MCP外部知识获取
