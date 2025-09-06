@@ -1,6 +1,6 @@
 """
 MCP服务管理器
-统一管理多个MCP服务的调用、监控和路由
+使用Node.js桥接服务调用官方@modelcontextprotocol/sdk
 """
 
 import asyncio
@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from enum import Enum
 import requests
 from urllib.parse import urlparse
+import subprocess
+import threading
 
 from config import config, MCPServiceConfig
 
@@ -32,8 +34,99 @@ class MCPCallResult:
     execution_time: float
     error_message: Optional[str] = None
 
+class MCPBridgeService:
+    """MCP桥接服务管理"""
+    
+    def __init__(self):
+        self.bridge_port = 3002
+        self.bridge_url = f"http://localhost:{self.bridge_port}"
+        self.bridge_process = None
+        self.is_starting = False
+        
+    def start_bridge_service(self):
+        """启动Node.js桥接服务"""
+        if self.is_starting:
+            return
+            
+        self.is_starting = True
+        
+        try:
+            # 检查服务是否已经运行
+            if self.is_bridge_running():
+                logger.info("✅ MCP桥接服务已在运行")
+                self.is_starting = False
+                return
+            
+            logger.info("🚀 启动MCP桥接服务...")
+            
+            # 检查Node.js和npm是否可用
+            try:
+                subprocess.run(['node', '--version'], capture_output=True, check=True)
+                subprocess.run(['npm', '--version'], capture_output=True, check=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                logger.error("❌ Node.js或npm未安装，无法启动MCP桥接服务")
+                self.is_starting = False
+                return
+            
+            # 安装依赖
+            bridge_dir = os.path.join(os.path.dirname(__file__), 'mcp_bridge')
+            if not os.path.exists(os.path.join(bridge_dir, 'node_modules')):
+                logger.info("📦 安装MCP桥接服务依赖...")
+                try:
+                    subprocess.run(['npm', 'install'], cwd=bridge_dir, check=True, capture_output=True)
+                except subprocess.CalledProcessError as e:
+                    logger.error(f"❌ npm install失败: {e}")
+                    self.is_starting = False
+                    return
+            
+            # 启动服务
+            def start_service():
+                try:
+                    self.bridge_process = subprocess.Popen(
+                        ['node', 'index.js'],
+                        cwd=bridge_dir,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                    )
+                    logger.info("✅ MCP桥接服务启动成功")
+                except Exception as e:
+                    logger.error(f"❌ MCP桥接服务启动失败: {e}")
+            
+            # 在后台线程启动
+            threading.Thread(target=start_service, daemon=True).start()
+            
+            # 等待服务启动
+            for i in range(10):
+                time.sleep(1)
+                if self.is_bridge_running():
+                    logger.info("✅ MCP桥接服务启动完成")
+                    break
+            else:
+                logger.warning("⚠️ MCP桥接服务启动超时")
+                
+        except Exception as e:
+            logger.error(f"❌ 启动MCP桥接服务失败: {e}")
+        finally:
+            self.is_starting = False
+    
+    def is_bridge_running(self) -> bool:
+        """检查桥接服务是否运行"""
+        try:
+            response = requests.get(f"{self.bridge_url}/health", timeout=2)
+            return response.status_code == 200
+        except:
+            return False
+    
+    def stop_bridge_service(self):
+        """停止桥接服务"""
+        if self.bridge_process:
+            self.bridge_process.terminate()
+            self.bridge_process = None
+            logger.info("🛑 MCP桥接服务已停止")
+
 class MCPServiceManager:
-    """MCP服务管理器"""
+    """MCP服务管理器 - 使用官方SDK"""
     
     def __init__(self):
         self.services = config.mcp_services
@@ -48,9 +141,13 @@ class MCPServiceManager:
             }
             for service_key in self.services.keys()
         }
+        self.bridge = MCPBridgeService()
+        
+        # 启动桥接服务
+        self.bridge.start_bridge_service()
     
     def get_service_for_url(self, url: str) -> List[MCPServiceType]:
-        """根据URL智能选择MCP服务 - 优化大众化场景"""
+        """根据URL智能选择MCP服务"""
         if not url:
             return []
         
@@ -67,7 +164,8 @@ class MCPServiceManager:
             # 如果是教育、健康、金融等相关项目，也调用DeepWiki
             if any(keyword in url_lower for keyword in [
                 "education", "health", "finance", "learning", "medical", 
-                "investment", "fitness", "diet", "blockchain", "web3"
+                "investment", "fitness", "diet", "blockchain", "web3",
+                "ethereum", "solidity", "smart-contract", "defi", "nft"
             ]):
                 services.append(MCPServiceType.DEEPWIKI)
         
@@ -88,9 +186,10 @@ class MCPServiceManager:
     def call_single_mcp_service(
         self, 
         service_type: MCPServiceType, 
-        payload: Dict[str, Any]
+        tool_name: str,
+        tool_args: Dict[str, Any]
     ) -> MCPCallResult:
-        """调用单个MCP服务"""
+        """调用单个MCP服务 - 使用官方SDK"""
         start_time = time.time()
         service_config = self.services[service_type.value]
         
@@ -103,55 +202,81 @@ class MCPServiceManager:
                 error_message="服务未启用"
             )
         
+        # 检查是否跳过MCP服务
+        skip_mcp = os.getenv("SKIP_MCP", "false").lower() == "true"
+        if skip_mcp:
+            return MCPCallResult(
+                success=False,
+                data="",
+                service_name=service_config.name,
+                execution_time=0.0,
+                error_message="MCP服务已被跳过 (SKIP_MCP=true)"
+            )
+        
         try:
-            logger.info(f"🔥 调用 {service_config.name} - URL: {service_config.url}")
-            logger.info(f"🔥 载荷: {json.dumps(payload, ensure_ascii=False, indent=2)}")
+            logger.info(f"🔥 调用 {service_config.name} 工具: {tool_name}")
+            logger.info(f"🔥 参数: {json.dumps(tool_args, ensure_ascii=False, indent=2)}")
             
-            headers = {"Content-Type": "application/json"}
-            if service_config.api_key:
-                headers["Authorization"] = f"Bearer {service_config.api_key}"
+            # 确保桥接服务运行
+            if not self.bridge.is_bridge_running():
+                logger.info("🔄 桥接服务未运行，尝试启动...")
+                self.bridge.start_bridge_service()
+                time.sleep(2)
+                
+                if not self.bridge.is_bridge_running():
+                    raise Exception("桥接服务启动失败")
+            
+            # 通过桥接服务调用MCP
+            payload = {
+                "url": service_config.url,
+                "toolName": tool_name,
+                "arguments": tool_args,
+                "config": {
+                    "headers": {"Authorization": f"Bearer {service_config.api_key}"} if service_config.api_key else {}
+                }
+            }
             
             response = requests.post(
-                service_config.url,
-                headers=headers,
+                f"{self.bridge.bridge_url}/call-tool",
                 json=payload,
-                timeout=service_config.timeout
+                timeout=30
             )
             
             execution_time = time.time() - start_time
             
-            logger.info(f"🔥 响应状态: {response.status_code}")
+            logger.info(f"🔥 桥接服务响应状态: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
                 
-                # 尝试多种响应格式
-                content = self._extract_content_from_response(data)
+                if data.get("success") and data.get("data"):
+                    content = self._extract_content_from_mcp_result(data["data"])
+                    
+                    if content and len(str(content).strip()) > 10:
+                        result = MCPCallResult(
+                            success=True,
+                            data=str(content),
+                            service_name=service_config.name,
+                            execution_time=execution_time
+                        )
+                        self._update_service_stats(service_type, True, execution_time)
+                        logger.info(f"✅ MCP调用成功，内容长度: {len(str(content))} 字符")
+                        return result
                 
-                if content and len(str(content).strip()) > 10:
-                    result = MCPCallResult(
-                        success=True,
-                        data=str(content),
-                        service_name=service_config.name,
-                        execution_time=execution_time
-                    )
-                    self._update_service_stats(service_type, True, execution_time)
-                    return result
-                else:
-                    error_msg = f"返回数据为空或格式错误: {data}"
-                    logger.warning(f"⚠️ {service_config.name} {error_msg}")
-                    result = MCPCallResult(
-                        success=False,
-                        data="",
-                        service_name=service_config.name,
-                        execution_time=execution_time,
-                        error_message=error_msg
-                    )
-                    self._update_service_stats(service_type, False, execution_time)
-                    return result
+                error_msg = data.get("error", "未知错误")
+                logger.warning(f"⚠️ {service_config.name} MCP调用失败: {error_msg}")
+                result = MCPCallResult(
+                    success=False,
+                    data="",
+                    service_name=service_config.name,
+                    execution_time=execution_time,
+                    error_message=error_msg
+                )
+                self._update_service_stats(service_type, False, execution_time)
+                return result
             else:
                 error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
-                logger.error(f"❌ {service_config.name} 调用失败: {error_msg}")
+                logger.error(f"❌ {service_config.name} 桥接服务调用失败: {error_msg}")
                 result = MCPCallResult(
                     success=False,
                     data="",
@@ -164,7 +289,7 @@ class MCPServiceManager:
                 
         except requests.exceptions.Timeout:
             execution_time = time.time() - start_time
-            error_msg = f"调用超时 ({service_config.timeout}s)"
+            error_msg = f"调用超时 (30秒)"
             logger.error(f"⏰ {service_config.name} {error_msg}")
             result = MCPCallResult(
                 success=False,
@@ -190,17 +315,41 @@ class MCPServiceManager:
             self._update_service_stats(service_type, False, execution_time)
             return result
     
-    def _extract_content_from_response(self, data: Dict) -> Optional[str]:
-        """从响应中提取内容"""
-        # 尝试多种可能的响应格式
-        content_keys = ["data", "result", "content", "message", "text"]
-        
-        for key in content_keys:
-            if key in data and data[key]:
-                return str(data[key])
-        
-        # 如果没有找到标准字段，返回整个数据的字符串表示
-        return str(data) if data else None
+    def _extract_content_from_mcp_result(self, mcp_result: Any) -> Optional[str]:
+        """从MCP调用结果中提取内容"""
+        try:
+            # MCP工具调用的标准响应格式
+            if isinstance(mcp_result, dict):
+                # 检查content字段
+                if "content" in mcp_result:
+                    content = mcp_result["content"]
+                    if isinstance(content, list) and len(content) > 0:
+                        # 处理内容数组
+                        texts = []
+                        for item in content:
+                            if isinstance(item, dict) and "text" in item:
+                                texts.append(item["text"])
+                            elif isinstance(item, str):
+                                texts.append(item)
+                        return "\n".join(texts)
+                    elif isinstance(content, str):
+                        return content
+                
+                # 检查其他可能的字段
+                for key in ["result", "data", "text", "message"]:
+                    if key in mcp_result and mcp_result[key]:
+                        return str(mcp_result[key])
+            
+            # 如果是字符串，直接返回
+            if isinstance(mcp_result, str):
+                return mcp_result
+            
+            # 其他情况，转换为字符串
+            return str(mcp_result) if mcp_result else None
+            
+        except Exception as e:
+            logger.error(f"💥 提取MCP结果内容失败: {e}")
+            return str(mcp_result) if mcp_result else None
     
     def _update_service_stats(self, service_type: MCPServiceType, success: bool, execution_time: float):
         """更新服务统计信息"""
@@ -219,11 +368,35 @@ class MCPServiceManager:
         ) / stats["total_calls"]
     
     def fetch_knowledge_from_url(self, url: str) -> Tuple[bool, str]:
-        """从URL获取知识 - 支持多MCP服务协作"""
+        """从URL获取知识 - 使用官方MCP SDK"""
         if not url or not url.strip():
             return False, ""
         
         url = url.strip()
+        
+        # 检查是否暂时跳过MCP服务
+        skip_mcp = os.getenv("SKIP_MCP", "false").lower() == "true"
+        if skip_mcp:
+            logger.info("🔄 跳过MCP服务调用 (SKIP_MCP=true)")
+            return False, f"""
+## 🔗 参考链接处理说明
+
+**📍 提供的链接**: {url}
+
+**🎯 处理方式**: 直接AI分析模式 (MCP服务已暂时禁用)
+
+**🤖 AI处理**: 将基于创意内容和链接信息进行智能分析
+
+**💡 说明**: 为确保系统稳定性，当前暂时禁用了外部MCP服务，AI会基于以下方式生成方案：
+- ✅ 基于创意描述进行深度分析  
+- ✅ 结合行业最佳实践
+- ✅ 提供完整的技术方案
+- ✅ 生成实用的编程提示词
+
+**🔧 技术说明**: 如需启用MCP服务，请在环境变量中设置 `SKIP_MCP=false`
+
+---
+"""
         
         # 验证URL格式
         try:
@@ -242,10 +415,10 @@ class MCPServiceManager:
         knowledge_sources = []
         successful_calls = 0
         
-        # 并行调用多个MCP服务
+        # 调用MCP服务获取内容
         for service_type in suitable_services:
-            payload = self._build_payload_for_service(service_type, url)
-            result = self.call_single_mcp_service(service_type, payload)
+            tool_name, tool_args = self._build_tool_call_for_service(service_type, url)
+            result = self.call_single_mcp_service(service_type, tool_name, tool_args)
             
             self.call_history.append(result)
             
@@ -266,25 +439,19 @@ class MCPServiceManager:
         else:
             return False, f"❌ 所有MCP服务调用失败，尝试了 {len(suitable_services)} 个服务"
     
-    def _build_payload_for_service(self, service_type: MCPServiceType, url: str) -> Dict[str, Any]:
-        """为不同的MCP服务构建载荷"""
+    def _build_tool_call_for_service(self, service_type: MCPServiceType, url: str) -> Tuple[str, Dict[str, Any]]:
+        """为不同的MCP服务构建工具调用"""
         if service_type == MCPServiceType.DEEPWIKI:
-            return {
-                "action": "deepwiki_fetch",
-                "params": {
-                    "url": url,
-                    "mode": "aggregate"
-                }
+            return "fetch_content", {
+                "url": url,
+                "mode": "aggregate"
             }
         elif service_type == MCPServiceType.FETCH:
-            return {
-                "action": "fetch",
-                "params": {
-                    "url": url
-                }
+            return "fetch", {
+                "url": url
             }
         else:
-            return {"url": url}
+            return "fetch", {"url": url}
     
     def _combine_knowledge_sources(self, url: str, sources: List[Dict]) -> str:
         """整合多个知识源"""
@@ -293,15 +460,15 @@ class MCPServiceManager:
         
         if len(sources) == 1:
             source = sources[0]
-            return f"📖 **{source['service']}**：\n\n{source['content']}"
+            return f"📖 **{source['service']}** (使用官方MCP SDK)：\n\n{source['content']}"
         
         # 多源整合
         fusion_header = f"""
-## 🧠 多源知识融合 ({len(sources)}个知识源)
+## 🧠 多源知识融合 ({len(sources)}个知识源) - 官方MCP SDK
 
 **🔗 原始链接：** {url}
 
-**🎯 MCP服务协作：** 智能路由系统已为您整合以下知识源
+**🎯 MCP服务协作：** 使用官方@modelcontextprotocol/sdk整合以下知识源
 
 ---
 
@@ -334,28 +501,17 @@ class MCPServiceManager:
                 }
                 continue
             
-            try:
-                # 简单的健康检查
-                health_url = f"{service_config.url.rstrip('/')}{service_config.health_check_path}"
-                response = requests.get(health_url, timeout=5)
-                
-                status[service_key] = {
-                    "name": service_config.name,
-                    "status": "healthy" if response.status_code == 200 else "unhealthy",
-                    "enabled": True,
-                    "url": service_config.url,
-                    "response_time": response.elapsed.total_seconds(),
-                    "stats": self.service_stats[service_key]
-                }
-            except Exception as e:
-                status[service_key] = {
-                    "name": service_config.name,
-                    "status": "error",
-                    "enabled": True,
-                    "url": service_config.url,
-                    "error": str(e),
-                    "stats": self.service_stats[service_key]
-                }
+            # 检查桥接服务状态
+            bridge_running = self.bridge.is_bridge_running()
+            
+            status[service_key] = {
+                "name": service_config.name,
+                "status": "healthy" if bridge_running else "unhealthy",
+                "enabled": True,
+                "url": service_config.url,
+                "bridge_status": "运行中" if bridge_running else "未运行",
+                "stats": self.service_stats[service_key]
+            }
         
         return status
     
@@ -365,11 +521,15 @@ class MCPServiceManager:
         enabled_services = sum(1 for info in status.values() if info["enabled"])
         healthy_services = sum(1 for info in status.values() if info["status"] == "healthy")
         
+        bridge_status = "运行中" if self.bridge.is_bridge_running() else "未运行"
+        
         if enabled_services == 0:
-            return """
-🔍 MCP服务状态监控
+            return f"""
+🔍 MCP服务状态监控 (官方SDK版本)
 
 **📊 服务概览**: 当前未配置MCP服务
+
+**🌉 桥接服务**: {bridge_status}
 
 **⚙️ 配置说明**:
 - DeepWiki MCP: 需要设置 `DEEPWIKI_MCP_URL` 环境变量
@@ -383,9 +543,12 @@ class MCPServiceManager:
 总计: 0/2 个服务可用
 """
         
-        status_html = """
+        status_html = f"""
         <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin: 15px 0;">
-            <h4 style="color: #2d3748; margin-bottom: 10px;">🔍 MCP服务状态监控</h4>
+            <h4 style="color: #2d3748; margin-bottom: 10px;">🔍 MCP服务状态监控 (官方@modelcontextprotocol/sdk)</h4>
+            <div style="margin-bottom: 10px;">
+                <strong>🌉 Node.js桥接服务:</strong> <span style="color: {'#28a745' if bridge_status == '运行中' else '#dc3545'};">{bridge_status}</span>
+            </div>
         """
         
         for service_key, info in status.items():
@@ -396,11 +559,7 @@ class MCPServiceManager:
             elif info["status"] == "healthy":
                 icon = "🟢"
                 color = "#28a745"
-                status_text = f"可用 ({info.get('response_time', 0):.2f}s)"
-            elif info["status"] == "unhealthy":
-                icon = "🟡"
-                color = "#ffc107"
-                status_text = "响应异常"
+                status_text = f"可用 (桥接: {info.get('bridge_status', '未知')})"
             else:
                 icon = "🔴"
                 color = "#dc3545"
@@ -428,60 +587,6 @@ class MCPServiceManager:
         """
         
         return status_html
-    
-    def get_debug_status(self) -> str:
-        """获取详细的调试状态信息"""
-        debug_lines = [
-            "## 🔧 MCP服务详细诊断",
-            "",
-            "### 📋 环境变量检查:",
-        ]
-        
-        env_vars = {
-            "DEEPWIKI_SSE_URL": os.getenv("DEEPWIKI_SSE_URL"),
-            "FETCH_SSE_URL": os.getenv("FETCH_SSE_URL")
-        }
-        
-        for var_name, var_value in env_vars.items():
-            if var_value:
-                debug_lines.append(f"- **{var_name}**: ✅ 已设置 ({var_value[:50]}...)")
-            else:
-                debug_lines.append(f"- **{var_name}**: ❌ 未设置")
-        
-        debug_lines.extend([
-            "",
-            "### 🔍 服务配置状态:"
-        ])
-        
-        for service_key, service_config in self.services.items():
-            stats = self.service_stats[service_key]
-            debug_lines.append(f"")
-            debug_lines.append(f"**{service_config.name}** ({service_key}):")
-            debug_lines.append(f"- URL: {service_config.url or '未配置'}")
-            debug_lines.append(f"- 启用状态: {'✅' if service_config.enabled else '❌'}")
-            debug_lines.append(f"- 超时设置: {service_config.timeout}秒")
-            debug_lines.append(f"- 总调用次数: {stats['total_calls']}")
-            debug_lines.append(f"- 成功次数: {stats['successful_calls']}")
-            debug_lines.append(f"- 失败次数: {stats['failed_calls']}")
-            if stats['average_response_time'] > 0:
-                debug_lines.append(f"- 平均响应时间: {stats['average_response_time']:.2f}秒")
-        
-        debug_lines.extend([
-            "",
-            "### 📊 调用历史 (最近5次):"
-        ])
-        
-        recent_calls = self.call_history[-5:] if self.call_history else []
-        if recent_calls:
-            for i, call in enumerate(recent_calls, 1):
-                status_emoji = "✅" if call.success else "❌"
-                debug_lines.append(f"{i}. {status_emoji} {call.service_name} - {call.execution_time:.2f}s")
-                if call.error_message:
-                    debug_lines.append(f"   错误: {call.error_message}")
-        else:
-            debug_lines.append("暂无调用历史")
-        
-        return "\n".join(debug_lines)
 
 # 全局MCP服务管理器实例
 mcp_manager = MCPServiceManager()
