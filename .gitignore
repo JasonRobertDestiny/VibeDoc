@@ -9,20 +9,6 @@ venv/
 .env
 .venv/
 
-# Node.js相关
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-package-lock.json
-.npm
-
-# 敏感配置文件
-.env
-*.key
-config.ini
-secrets.json
-
 # 测试文件
 test_*.py
 debug_*.py

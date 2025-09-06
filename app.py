@@ -31,15 +31,6 @@ API_URL = config.ai_model.api_url
 
 # 应用启动时的初始化
 logger.info("🚀 VibeDoc Agent应用启动")
-
-# 检测ModelSpace环境
-is_modelspace = os.getenv('MODELSCOPE_ENVIRONMENT') or os.getenv('SPACE_ID')
-if is_modelspace:
-    logger.info("🏠 检测到ModelSpace环境，应用特殊配置")
-    # ModelSpace环境下的特殊处理
-    os.environ.setdefault('ENVIRONMENT', 'production')
-    os.environ.setdefault('PORT', '7860')
-
 logger.info(f"📊 配置摘要: {json.dumps(config.get_config_summary(), ensure_ascii=False, indent=2)}")
 
 # 验证配置
@@ -206,7 +197,7 @@ def fetch_external_knowledge(reference_url: str) -> str:
     try:
         # 简单的HEAD请求检查URL是否存在
         logger.info(f"🌐 验证链接可访问性: {url}")
-        response = requests.head(url, timeout=20, allow_redirects=True)
+        response = requests.head(url, timeout=10, allow_redirects=True)
         logger.info(f"📡 链接验证结果: HTTP {response.status_code}")
         
         if response.status_code >= 400:
@@ -229,12 +220,35 @@ def fetch_external_knowledge(reference_url: str) -> str:
             logger.info(f"✅ 链接可访问，状态码: {response.status_code}")
             
     except requests.exceptions.Timeout:
-        logger.warning(f"⏰ URL验证超时: {url}，但仍然尝试MCP服务")
-        # 不要返回，继续尝试MCP服务
-        
+        logger.warning(f"⏰ URL验证超时: {url}")
+        return f"""
+## 🔗 参考链接处理说明
+
+**📍 提供的链接**: {url}
+
+**⏰ 处理状态**: 链接验证超时
+
+**🤖 AI处理**: 将基于创意内容进行智能分析，不依赖外部链接
+
+**💡 说明**: 为确保生成质量，AI会根据创意描述生成完整方案，避免引用不确定的外部内容
+
+---
+"""
     except Exception as e:
-        logger.warning(f"⚠️ URL验证失败: {url} - {str(e)}，但仍然尝试MCP服务")
-        # 不要返回，继续尝试MCP服务
+        logger.warning(f"⚠️ URL验证失败: {url} - {str(e)}")
+        return f"""
+## 🔗 参考链接处理说明
+
+**📍 提供的链接**: {url}
+
+**🔍 处理状态**: 暂时无法验证链接可用性 ({str(e)[:100]})
+
+**🤖 AI处理**: 将基于创意内容进行智能分析，不依赖外部链接
+
+**💡 说明**: 为确保生成质量，AI会根据创意描述生成完整方案，避免引用不确定的外部内容
+
+---
+"""
     
     # 尝试调用MCP服务
     logger.info(f"🔄 尝试调用MCP服务获取知识...")
@@ -248,14 +262,8 @@ def fetch_external_knowledge(reference_url: str) -> str:
         # MCP服务成功返回有效内容
         logger.info(f"✅ MCP服务成功获取知识，内容长度: {len(knowledge)} 字符")
         
-        # 验证返回的内容是否包含实际知识而不是明显的错误信息
-        error_indicators = ['An error occurred', 'Connection failed', 'Request failed', 'Invalid response', '服务器错误', '连接失败', '请求失败']
-        has_error = any(indicator in knowledge for indicator in error_indicators)
-        
-        # 检查是否有足够的实际内容（排除明显的错误消息）
-        content_length_sufficient = len(knowledge.strip()) > 100
-        
-        if not has_error and content_length_sufficient:
+        # 验证返回的内容是否包含实际知识而不是错误信息
+        if not any(keyword in knowledge.lower() for keyword in ['error', 'failed', '错误', '失败', '不可用']):
             return f"""
 ## 📚 外部知识库参考
 
@@ -272,7 +280,7 @@ def fetch_external_knowledge(reference_url: str) -> str:
 ---
 """
         else:
-            logger.warning(f"⚠️ MCP返回内容质量不符合要求: {knowledge[:200]}")
+            logger.warning(f"⚠️ MCP返回内容包含错误信息: {knowledge[:200]}")
     else:
         # MCP服务失败或返回无效内容，提供明确说明
         logger.warning(f"⚠️ MCP服务调用失败或返回无效内容")
@@ -520,9 +528,9 @@ def fix_mermaid_syntax(content: str) -> str:
         
         # 修复中文节点名称的问题 - 彻底清理引号格式
         (r'([A-Z]+)\["([^"]+)"\]', r'\1["\2"]'),  # 标准格式：A["文本"]
-        (r'([A-Z]+)\[""([^"]+)""\]', r'\1[\2]'),  # 双引号错误：A[""文本""] -> A[文本]
+        (r'([A-Z]+)\[""([^"]+)""\]', r'\1["\2"]'),  # 双引号错误：A[""文本""]
         (r'([A-Z]+)\["⚡"([^"]+)""\]', r'\1["\2"]'),  # 带emoji错误
-        (r'([A-Z]+)\[([^\]]*[^\x00-\x7F][^\]]*)\]', r'\1[\2]'),  # 中文无引号，保持简单格式
+        (r'([A-Z]+)\[([^\]]*[^\x00-\x7F][^\]]*)\]', r'\1["\2"]'),  # 中文无引号
         
         # 确保流程图语法正确
         (r'graph TB\n\s*graph', r'graph TB'),
@@ -798,7 +806,7 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
         },
         duration=knowledge_duration,
         quality_score=80 if retrieved_knowledge else 50,
-        evidence=f"获取的知识内容: '{(retrieved_knowledge[:100] + '...') if retrieved_knowledge else '无'}' (长度: {len(retrieved_knowledge) if retrieved_knowledge else 0}字符)"
+        evidence=f"获取的知识内容: '{retrieved_knowledge[:100]}...' (长度: {len(retrieved_knowledge) if retrieved_knowledge else 0}字符)"
     )
     
     # 获取当前日期并计算项目开始日期
