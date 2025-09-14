@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m py_compile /mnt/d/Fixed_program/Vibedocs/enhanced_mcp_client.py)",
+      "Bash(python -c \"from app import fetch_knowledge_from_url_via_mcp, get_mcp_status_display; print(''✅ 主要功能导入成功'')\")",
+      "Bash(python -c \"\ntry:\n    from enhanced_mcp_client import call_fetch_mcp_async, call_deepwiki_mcp_async\n    print(''✅ enhanced_mcp_client 导入成功'')\nexcept ImportError as e:\n    print(f''❌ enhanced_mcp_client 导入失败: {e}'')\n\ntry:\n    import gradio as gr\n    print(''✅ gradio 导入成功'')\nexcept ImportError as e:\n    print(f''❌ gradio 导入失败: {e}'')\n\nprint(''🎉 核心MCP功能已就绪'')\n\")",
+      "Bash(pip install markdown python-docx reportlab html2text)",
+      "Bash(python3 -m venv venv)",
+      "Bash(source venv/bin/activate)",
+      "Bash(pip install -r requirements.txt)",
+      "Bash(python -c \"import gradio, markdown; print(''✅ 核心依赖已安装'')\")",
+      "Bash(pip install gradio markdown requests)",
+      "Bash(pip install --user gradio requests)",
+      "Bash(python startup_test.py)",
+      "Bash(python -c \"import gradio; print(''Gradio version:'', gradio.__version__)\")",
+      "Bash(pip install --break-system-packages markdown python-docx)",
+      "Bash(export SILICONFLOW_API_KEY=sk-fxeehbzkospkgoluchoqgxgkszkjaluozkohofghkzrqianx)",
+      "Bash(pip install --break-system-packages html2text reportlab)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

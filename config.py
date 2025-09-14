@@ -36,32 +36,29 @@ class AppConfig:
     """应用总配置类"""
     
     def __init__(self):
-        self.environment = os.getenv("ENVIRONMENT", "development")  # 修正环境变量名
+        self.environment = os.getenv("ENVIRONMENT", "development")
         self.debug = os.getenv("DEBUG", "false").lower() == "true"
-        self.port = int(os.getenv("PORT", "7860"))  # 默认端口改为7860
+        self.port = int(os.getenv("PORT", "7860"))
         
         # AI模型配置
         self.ai_model = AIModelConfig(
             api_key=os.getenv("SILICONFLOW_API_KEY", ""),
-            timeout=int(os.getenv("API_TIMEOUT", "300"))  # AI生成超时设为300秒（5分钟）
+            timeout=int(os.getenv("API_TIMEOUT", "300"))
         )
         
-        # MCP服务配置 - 提供默认服务说明
-        deepwiki_url = os.getenv("DEEPWIKI_MCP_URL")
-        fetch_url = os.getenv("FETCH_MCP_URL")
-        
+        # 简化MCP服务配置 - 直接使用内置URL，避免环境变量复杂性
         self.mcp_services = {
             "deepwiki": MCPServiceConfig(
                 name="DeepWiki MCP",
-                url=deepwiki_url,
-                timeout=int(os.getenv("MCP_TIMEOUT", "120")),
-                enabled=bool(deepwiki_url)  # 只有URL存在才启用
+                url="https://mcp.api-inference.modelscope.net/d4ed08072d2846/sse",
+                timeout=int(os.getenv("MCP_TIMEOUT", "60")),
+                enabled=True  # 默认启用，简化配置
             ),
             "fetch": MCPServiceConfig(
                 name="Fetch MCP", 
-                url=fetch_url,
-                timeout=int(os.getenv("MCP_TIMEOUT", "120")),
-                enabled=bool(fetch_url)  # 只有URL存在才启用
+                url="https://mcp.api-inference.modelscope.net/6ec508e067dc41/sse",
+                timeout=int(os.getenv("MCP_TIMEOUT", "60")),
+                enabled=True  # 默认启用，简化配置
             )
         }
         

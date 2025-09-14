@@ -12,11 +12,11 @@ from urllib.parse import urlparse
 
 # 导入模块化组件
 from config import config
-from mcp_manager import mcp_manager
+# 已移除 mcp_direct_client，使用 enhanced_mcp_client
+from export_manager import export_manager
 from prompt_optimizer import prompt_optimizer
 from explanation_manager import explanation_manager, ProcessingStage
 from plan_editor import plan_editor
-from export_manager import export_manager
 
 # 配置日志
 logging.basicConfig(
@@ -110,9 +110,92 @@ def validate_url(url: str) -> bool:
     except Exception:
         return False
 
+def fetch_knowledge_from_url_via_mcp(url: str) -> tuple[bool, str]:
+    """通过增强版异步MCP服务从URL获取知识 - 魔塔平台优化版"""
+    from enhanced_mcp_client import call_fetch_mcp_async, call_deepwiki_mcp_async
+    
+    # 智能选择MCP服务
+    if "deepwiki.org" in url.lower():
+        # DeepWiki MCP 专门处理 deepwiki.org 域名
+        try:
+            logger.info(f"🔍 检测到 deepwiki.org 链接，使用异步 DeepWiki MCP: {url}")
+            result = call_deepwiki_mcp_async(url)
+            
+            if result.success and result.data and len(result.data.strip()) > 10:
+                logger.info(f"✅ DeepWiki MCP异步调用成功，内容长度: {len(result.data)}, 耗时: {result.execution_time:.2f}s")
+                return True, result.data
+            else:
+                logger.warning(f"⚠️ DeepWiki MCP失败，改用 Fetch MCP: {result.error_message}")
+        except Exception as e:
+            logger.error(f"❌ DeepWiki MCP调用异常，改用 Fetch MCP: {str(e)}")
+    
+    # 使用通用的异步 Fetch MCP 服务
+    try:
+        logger.info(f"🌐 使用异步 Fetch MCP 获取内容: {url}")
+        result = call_fetch_mcp_async(url, max_length=8000)  # 增加长度限制
+        
+        if result.success and result.data and len(result.data.strip()) > 10:
+            logger.info(f"✅ Fetch MCP异步调用成功，内容长度: {len(result.data)}, 耗时: {result.execution_time:.2f}s")
+            return True, result.data
+        else:
+            logger.warning(f"⚠️ Fetch MCP调用失败: {result.error_message}")
+            return False, f"MCP服务调用失败: {result.error_message or '未知错误'}"
+    except Exception as e:
+        logger.error(f"❌ Fetch MCP调用异常: {str(e)}")
+        return False, f"MCP服务调用异常: {str(e)}"
+
 def get_mcp_status_display() -> str:
-    """获取MCP服务状态显示 - 使用模块化管理器"""
-    return mcp_manager.get_status_summary()
+    """获取MCP服务状态显示 - 异步MCP服务版"""
+    try:
+        from enhanced_mcp_client import async_mcp_client
+        
+        # 快速测试两个服务的连通性
+        services_status = []
+        
+        # 测试Fetch MCP
+        fetch_test_result = async_mcp_client.call_mcp_service_async(
+            "fetch", "fetch", {"url": "https://httpbin.org/get", "max_length": 100}
+        )
+        fetch_ok = fetch_test_result.success
+        fetch_time = fetch_test_result.execution_time
+        
+        # 测试DeepWiki MCP  
+        deepwiki_test_result = async_mcp_client.call_mcp_service_async(
+            "deepwiki", "deepwiki_fetch", {"url": "https://deepwiki.org/openai/openai-python", "mode": "aggregate"}
+        )
+        deepwiki_ok = deepwiki_test_result.success
+        deepwiki_time = deepwiki_test_result.execution_time
+        
+        # 构建状态显示
+        fetch_icon = "✅" if fetch_ok else "❌"
+        deepwiki_icon = "✅" if deepwiki_ok else "❌"
+        
+        status_lines = [
+            "## 🚀 异步MCP服务状态 (魔塔优化版)",
+            f"- {fetch_icon} **Fetch MCP**: {'在线' if fetch_ok else '离线'} (通用网页抓取)"
+        ]
+        
+        if fetch_ok:
+            status_lines.append(f"  ⏱️ 响应时间: {fetch_time:.2f}秒")
+        
+        status_lines.append(f"- {deepwiki_icon} **DeepWiki MCP**: {'在线' if deepwiki_ok else '离线'} (仅限 deepwiki.org)")
+        
+        if deepwiki_ok:
+            status_lines.append(f"  ⏱️ 响应时间: {deepwiki_time:.2f}秒")
+        
+        status_lines.extend([
+            "",
+            "🧠 **智能异步路由:**",
+            "- `deepwiki.org` → DeepWiki MCP (异步处理)",
+            "- 其他网站 → Fetch MCP (异步处理)", 
+            "- HTTP 202 → SSE监听 → 结果获取",
+            "- 自动降级 + 错误恢复"
+        ])
+        
+        return "\n".join(status_lines)
+        
+    except Exception as e:
+        return f"## MCP服务状态\n- ❌ **检查失败**: {str(e)}\n- 💡 请确保enhanced_mcp_client.py文件存在"
 
 def call_mcp_service(url: str, payload: Dict[str, Any], service_name: str, timeout: int = 120) -> Tuple[bool, str]:
     """统一的MCP服务调用函数
@@ -253,7 +336,7 @@ def fetch_external_knowledge(reference_url: str) -> str:
     # 尝试调用MCP服务
     logger.info(f"🔄 尝试调用MCP服务获取知识...")
     mcp_start_time = datetime.now()
-    success, knowledge = mcp_manager.fetch_knowledge_from_url(url)
+    success, knowledge = fetch_knowledge_from_url_via_mcp(url)
     mcp_duration = (datetime.now() - mcp_start_time).total_seconds()
     
     logger.info(f"📊 MCP服务调用结果: 成功={success}, 内容长度={len(knowledge) if knowledge else 0}, 耗时={mcp_duration:.2f}秒")
@@ -286,7 +369,7 @@ def fetch_external_knowledge(reference_url: str) -> str:
         logger.warning(f"⚠️ MCP服务调用失败或返回无效内容")
         
         # 详细诊断MCP服务状态
-        mcp_status = mcp_manager.get_status_summary()
+        mcp_status = get_mcp_status_display()
         logger.info(f"🔍 MCP服务状态详情: {mcp_status}")
         
         return f"""
@@ -801,7 +884,7 @@ def generate_development_plan(user_idea: str, reference_url: str = "") -> Tuple[
         success=bool(retrieved_knowledge and "成功获取" in retrieved_knowledge),
         details={
             "参考链接": reference_url or "无",
-            "MCP服务状态": mcp_manager.get_status_summary(),
+            "MCP服务状态": get_mcp_status_display(),
             "知识内容长度": len(retrieved_knowledge) if retrieved_knowledge else 0
         },
         duration=knowledge_duration,
@@ -3962,75 +4045,105 @@ with gr.Blocks(
         </div>
         """)
         
-    # 示例区域
+    # 示例区域 - 优化并添加真实deepwiki.org URL
     gr.Markdown("## 🎯 快速开始", elem_id="quick_start_container")
     gr.Examples(
         examples=[
             [
-                "AI驱动的智能客服系统：多轮对话、情感分析、知识库检索、自动工单",
-                "https://docs.python.org/3/library/sqlite3.html"
+                "AI驱动的智能客服系统：支持多轮对话、情感分析、知识库检索、自动工单生成和智能回复",
+                "https://deepwiki.org/openai/openai-python"
             ],
             [
-                "区块链NFT艺术品交易平台：铸造、拍卖、版权保护、社区治理",
+                "基于React和TypeScript的现代Web应用：包含用户认证、实时数据同步、响应式设计、PWA支持",
+                "https://deepwiki.org/facebook/react"
+            ],
+            [
+                "区块链NFT艺术品交易平台：智能合约、元数据存储、拍卖机制、版权保护、社区治理",
                 "https://ethereum.org/en/developers/docs/"
             ],
             [
-                "智能健康管理App：运动追踪、饮食分析、健康报告、医生在线咨询",
+                "智能健康管理App：运动追踪、饮食分析、健康报告、医生在线咨询、个性化建议",
                 "https://www.who.int/health-topics/physical-activity"
             ],
             [
-                "开发者协作平台：代码审查、项目管理、实时协作、CI/CD集成",
-                "https://github.com/microsoft/vscode"
+                "Python机器学习工具库：数据预处理、模型训练、超参数调优、模型部署、可视化分析",
+                "https://deepwiki.org/scikit-learn/scikit-learn"
             ],
             [
-                "在线教育平台：直播授课、智能批改、学习路径推荐、师生互动社区",
-                ""
+                "微服务架构电商平台：服务发现、负载均衡、分布式事务、缓存策略、监控告警",
+                "https://github.com/microsoft/vscode"
             ]
         ],
         inputs=[idea_input, reference_url_input],
-        label="🎯 快速体验示例 - MCP 服务增强",
-        examples_per_page=5,
+        label="🎯 智能示例 - 体验MCP服务增强",
+        examples_per_page=6,
         elem_id="enhanced_examples"
     )
     
-    # 使用说明 - 更新为MCP服务介绍
+    # 使用说明 - 异步MCP服务 + 魔塔平台优化
     gr.HTML("""
     <div class="prompts-section" id="ai_helper_instructions">
-        <h3>🚀 MCP 服务增强功能</h3>
-        <p><strong>集成魔塔 MCP 广场服务：</strong></p>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0;">
-            <div style="text-align: center; padding: 15px; background: #f0f8ff; border-radius: 12px; border: 2px solid #4299e1;">
-                <span style="font-size: 24px;">📖</span><br>
-                <strong>DeepWiki MCP</strong><br>
-                <small style="color: #666;">深度技术文档解析</small>
-            </div>
-            <div style="text-align: center; padding: 15px; background: #f0fff4; border-radius: 12px; border: 2px solid #48bb78;">
-                <span style="font-size: 24px;">🕷️</span><br>
-                <strong>Fetch MCP</strong><br>
-                <small style="color: #666;">通用网页内容抓取</small>
-            </div>
+        <h3>🚀 魔塔 MCP 异步服务 - 完全可用</h3>
+        
+        <!-- 主要服务：Fetch MCP -->
+        <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #e8f5e8 0%, #f0fff4 100%); border-radius: 15px; border: 3px solid #28a745; margin: 15px 0;">
+            <span style="font-size: 36px;">🕷️</span><br>
+            <strong style="font-size: 18px; color: #155724;">Fetch MCP (主力服务)</strong><br>
+            <small style="color: #155724; font-weight: 600; font-size: 13px;">
+                🌐 支持所有网站 • ⚡ 异步处理 • ✅ 完全可用
+            </small>
         </div>
         
-        <h4>🤖 AI 编程工具支持</h4>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0;">
-            <div style="text-align: center; padding: 10px; background: #f0f8ff; border-radius: 8px;">
-                <span style="font-size: 20px;">🔵</span><br>
-                <strong>Claude Code</strong>
+        <!-- 特殊服务：DeepWiki MCP -->
+        <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #e3f2fd 0%, #f0f8ff 100%); border-radius: 12px; border: 2px solid #2196f3; margin: 15px 0;">
+            <span style="font-size: 30px;">📖</span><br>
+            <strong style="font-size: 16px; color: #1976d2;">DeepWiki MCP (专用服务)</strong><br>
+            <small style="color: #1976d2; font-weight: 600; font-size: 12px;">
+                🔒 仅限 deepwiki.org • 📚 深度解析 • ⚡ 异步处理
+            </small>
+        </div>
+        
+        <!-- 异步处理流程说明 -->
+        <div style="background: linear-gradient(135deg, #fff3e0 0%, #fffaf0 100%); padding: 15px; border-radius: 10px; margin: 15px 0; border-left: 4px solid #ff9800;">
+            <strong style="color: #f57c00;">⚡ 异步处理流程:</strong>
+            <ol style="margin: 10px 0; padding-left: 20px; font-size: 14px;">
+                <li><strong>建立连接</strong> → SSE连接到魔塔MCP服务</li>
+                <li><strong>发送请求</strong> → HTTP 202 异步接收</li>
+                <li><strong>监听结果</strong> → SSE流实时获取响应</li>
+                <li><strong>智能选择</strong> → deepwiki.org用专用服务，其他用通用服务</li>
+                <li><strong>自动降级</strong> → 失败时切换服务，确保成功</li>
+            </ol>
+        </div>
+        
+        <!-- 魔塔平台优化说明 -->
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin: 15px 0; border-left: 4px solid #6c757d;">
+            <strong style="color: #495057;">🎯 魔塔平台优化:</strong>
+            <ul style="margin: 10px 0; padding-left: 20px; font-size: 14px;">
+                <li><strong>零配置部署</strong> → 硬编码服务URL，直接运行</li>
+                <li><strong>异步处理</strong> → 支持HTTP 202 + SSE流</li>
+                <li><strong>智能重试</strong> → 自动处理网络波动</li>
+                <li><strong>性能优化</strong> → 并发处理，响应迅速</li>
+            </ul>
+        </div>
+        
+        <h4>🤖 AI 编程工具完美支持</h4>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 12px 0;">
+            <div style="text-align: center; padding: 8px; background: #e3f2fd; border-radius: 6px; border: 1px solid #2196f3; box-shadow: 0 2px 4px rgba(33,150,243,0.2);">
+                <span style="font-size: 16px;">🔵</span> <strong style="font-size: 12px;">Claude Code</strong>
             </div>
-            <div style="text-align: center; padding: 10px; background: #f0fff4; border-radius: 8px;">
-                <span style="font-size: 20px;">🟢</span><br>
-                <strong>GitHub Copilot</strong>
+            <div style="text-align: center; padding: 8px; background: #e8f5e8; border-radius: 6px; border: 1px solid #4caf50; box-shadow: 0 2px 4px rgba(76,175,80,0.2);">
+                <span style="font-size: 16px;">🟢</span> <strong style="font-size: 12px;">GitHub Copilot</strong>
             </div>
-            <div style="text-align: center; padding: 10px; background: #fffaf0; border-radius: 8px;">
-                <span style="font-size: 20px;">🟡</span><br>
-                <strong>ChatGPT</strong>
+            <div style="text-align: center; padding: 8px; background: #fff3e0; border-radius: 6px; border: 1px solid #ff9800; box-shadow: 0 2px 4px rgba(255,152,0,0.2);">
+                <span style="font-size: 16px;">🟡</span> <strong style="font-size: 12px;">ChatGPT</strong>
             </div>
-            <div style="text-align: center; padding: 10px; background: #fff0f5; border-radius: 8px;">
-                <span style="font-size: 20px;">🔴</span><br>
-                <strong>其他AI工具</strong>
+            <div style="text-align: center; padding: 8px; background: #fce4ec; border-radius: 6px; border: 1px solid #e91e63; box-shadow: 0 2px 4px rgba(233,30,99,0.2);">
+                <span style="font-size: 16px;">🔴</span> <strong style="font-size: 12px;">其他AI工具</strong>
             </div>
         </div>
-        <p style="text-align: center; color: #666;"><em>💡 MCP 服务提供外部知识，AI 生成专业代码</em></p>
+        <p style="text-align: center; color: #28a745; font-weight: 700; font-size: 15px; background: #d4edda; padding: 8px; border-radius: 8px; border: 1px solid #c3e6cb;">
+            <em>🎉 魔塔异步MCP + AI生成 = 完美部署方案</em>
+        </p>
     </div>
     """)
     
@@ -4166,7 +4279,7 @@ if __name__ == "__main__":
             demo.launch(
                 server_name="0.0.0.0",
                 server_port=port,
-                share=False,
+                share=True,
                 show_error=config.debug,
                 prevent_thread_lock=False
             )
