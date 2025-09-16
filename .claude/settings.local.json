@@ -15,7 +15,8 @@
       "Bash(python -c \"import gradio; print(''Gradio version:'', gradio.__version__)\")",
       "Bash(pip install --break-system-packages markdown python-docx)",
       "Bash(export SILICONFLOW_API_KEY=sk-fxeehbzkospkgoluchoqgxgkszkjaluozkohofghkzrqianx)",
-      "Bash(pip install --break-system-packages html2text reportlab)"
+      "Bash(pip install --break-system-packages html2text reportlab)",
+      "Bash(git add .)"
     ],
     "deny": [],
     "ask": []

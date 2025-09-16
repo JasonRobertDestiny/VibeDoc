@@ -1,3 +1,15 @@
+---
+title: VibeDoc - AI驱动的开发计划生成器
+emoji: 🚀
+colorFrom: blue
+colorTo: purple
+sdk: gradio
+sdk_version: 5.34.1
+app_file: app.py
+pinned: true
+license: mit
+---
+
 # 🚀 VibeDoc Agent：您的随身AI产品经理与架构师
 
 [![魔塔MCP&Agent挑战赛2025](https://img.shields.io/badge/魔塔-MCP%26Agent挑战赛2025-blue)](https://modelscope.cn/studios/JasonRobert/Vibedocs)
