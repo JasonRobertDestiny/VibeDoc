@@ -3954,7 +3954,7 @@ with gr.Blocks(
                 <h4 style="color: #3182ce;">⏱️ 生成时间</h4>
                 <ul>
                     <li><span style="color: #e53e3e;">✨</span> 创意优化：20秒</li>
-                    <li><span style="color: #38a169;">📝</span> 方案生成：60-180秒</li>
+                    <li><span style="color: #38a169;">📝</span> 方案生成：150-200秒</li>
                     <li><span style="color: #d69e2e;">⚡</span> 一键复制下载</li>
                 </ul>
             </div>
