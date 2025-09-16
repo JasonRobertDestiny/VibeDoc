@@ -16,7 +16,10 @@
       "Bash(pip install --break-system-packages markdown python-docx)",
       "Bash(export SILICONFLOW_API_KEY=sk-fxeehbzkospkgoluchoqgxgkszkjaluozkohofghkzrqianx)",
       "Bash(pip install --break-system-packages html2text reportlab)",
-      "Bash(git add .)"
+      "Bash(git add .)",
+      "Bash(git commit -m \"$(cat <<''EOF''\n🚀 更新前端时间显示和ModelScope部署配置\n\n- 更新创意优化时间：~180秒 → 20秒\n- 更新方案生成时间：60-100秒 → 60-180秒  \n- 添加ModelScope frontmatter配置到README.md\n- 创建.modelscope部署配置文件\n- 优化MCP&Agent挑战赛部署准备\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push origin master)",
+      "Bash(git commit -m \"删除不必要的.modelscope配置文件\n\n- 移除.modelscope文件，使用README.md frontmatter配置\n- 简化部署配置，ModelScope会自动识别README.md设置\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\")"
     ],
     "deny": [],
     "ask": []
