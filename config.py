@@ -125,48 +125,48 @@ config = AppConfig()
 
 # 常用配置常量
 EXAMPLE_CONFIGURATIONS = {
-    "single_mcp": {
-        "description": "单MCP服务示例 - 贴近大众生活",
+    "web_applications": {
+        "description": "Web Application Development Examples",
         "examples": [
             {
-                "idea": "开发一个智能投资助手，提供股票基金分析和个性化投资建议",
-                "reference_url": "https://docs.deepwiki.org/finance/investment-analysis",
-                "expected_services": ["deepwiki"]
+                "idea": "E-commerce platform with product catalog, shopping cart, and payment integration",
+                "reference_url": "https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps",
+                "category": "web"
             },
             {
-                "idea": "创建一个在线学习平台，支持课程管理和学习进度跟踪",
-                "reference_url": "https://docs.deepwiki.org/education/online-learning",
-                "expected_services": ["deepwiki"]
+                "idea": "Social networking platform with user profiles, posts, comments, and real-time chat",
+                "reference_url": "https://react.dev/learn",
+                "category": "web"
             }
         ]
     },
-    "dual_mcp": {
-        "description": "双MCP服务协作示例 - 实用场景", 
+    "mobile_apps": {
+        "description": "Mobile Application Examples",
         "examples": [
             {
-                "idea": "构建一个智能健康管理系统，包含运动记录和健康分析功能",
-                "reference_url": "https://github.com/microsoft/healthcare-bot",
-                "expected_services": ["fetch", "deepwiki"]
+                "idea": "Fitness tracking app with workout plans, nutrition tracking, and progress analytics",
+                "reference_url": "",
+                "category": "mobile"
             },
             {
-                "idea": "开发一个家庭理财规划工具，支持预算管理和投资建议",
-                "reference_url": "https://github.com/firefly-iii/firefly-iii",
-                "expected_services": ["fetch", "deepwiki"]
+                "idea": "Language learning app with gamification, speech recognition, and personalized lessons",
+                "reference_url": "",
+                "category": "mobile"
             }
         ]
     },
-    "triple_mcp": {
-        "description": "双MCP服务完整协作示例",
+    "data_science": {
+        "description": "Data Science & AI Project Examples",
         "examples": [
             {
-                "idea": "构建数字藏品交易平台，集成NFT展示和社区功能",
-                "reference_url": "https://docs.deepwiki.org/blockchain/nft-marketplace",
-                "expected_services": ["deepwiki", "fetch"]
+                "idea": "Customer sentiment analysis system using NLP and machine learning",
+                "reference_url": "https://scikit-learn.org/stable/",
+                "category": "data_science"
             },
             {
-                "idea": "创建智能教育助手，结合AI答疑和学习资源推荐",
-                "reference_url": "https://docs.deepwiki.org/ai/education-assistant",
-                "expected_services": ["deepwiki", "fetch"]
+                "idea": "Predictive maintenance platform for industrial equipment using IoT sensors",
+                "reference_url": "",
+                "category": "data_science"
             }
         ]
     }

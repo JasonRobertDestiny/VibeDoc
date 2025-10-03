@@ -30,14 +30,15 @@ API_KEY = config.ai_model.api_key
 API_URL = config.ai_model.api_url
 
 # 应用启动时的初始化
-logger.info("🚀 VibeDoc Agent应用启动")
-logger.info(f"📊 配置摘要: {json.dumps(config.get_config_summary(), ensure_ascii=False, indent=2)}")
+logger.info("🚀 VibeDoc：您的随身AI产品经理与架构师")
+logger.info("📦 Version: 2.0.0 | Open Source Edition")
+logger.info(f"📊 Configuration: {json.dumps(config.get_config_summary(), ensure_ascii=False, indent=2)}")
 
 # 验证配置
 config_errors = config.validate_config()
 if config_errors:
     for key, error in config_errors.items():
-        logger.warning(f"⚠️ 配置警告 {key}: {error}")
+        logger.warning(f"⚠️ Configuration Warning {key}: {error}")
 
 def get_processing_explanation() -> str:
     """获取处理过程的详细说明"""
@@ -111,7 +112,7 @@ def validate_url(url: str) -> bool:
         return False
 
 def fetch_knowledge_from_url_via_mcp(url: str) -> tuple[bool, str]:
-    """通过增强版异步MCP服务从URL获取知识 - 魔塔平台优化版"""
+    """通过增强版异步MCP服务从URL获取知识"""
     from enhanced_mcp_client import call_fetch_mcp_async, call_deepwiki_mcp_async
     
     # 智能选择MCP服务
@@ -145,33 +146,33 @@ def fetch_knowledge_from_url_via_mcp(url: str) -> tuple[bool, str]:
         return False, f"MCP服务调用异常: {str(e)}"
 
 def get_mcp_status_display() -> str:
-    """获取MCP服务状态显示 - 异步MCP服务版"""
+    """获取MCP服务状态显示"""
     try:
         from enhanced_mcp_client import async_mcp_client
-        
+
         # 快速测试两个服务的连通性
         services_status = []
-        
+
         # 测试Fetch MCP
         fetch_test_result = async_mcp_client.call_mcp_service_async(
             "fetch", "fetch", {"url": "https://httpbin.org/get", "max_length": 100}
         )
         fetch_ok = fetch_test_result.success
         fetch_time = fetch_test_result.execution_time
-        
-        # 测试DeepWiki MCP  
+
+        # 测试DeepWiki MCP
         deepwiki_test_result = async_mcp_client.call_mcp_service_async(
             "deepwiki", "deepwiki_fetch", {"url": "https://deepwiki.org/openai/openai-python", "mode": "aggregate"}
         )
         deepwiki_ok = deepwiki_test_result.success
         deepwiki_time = deepwiki_test_result.execution_time
-        
+
         # 构建状态显示
         fetch_icon = "✅" if fetch_ok else "❌"
         deepwiki_icon = "✅" if deepwiki_ok else "❌"
-        
+
         status_lines = [
-            "## 🚀 异步MCP服务状态 (魔塔优化版)",
+            "## 🚀 异步MCP服务状态",
             f"- {fetch_icon} **Fetch MCP**: {'在线' if fetch_ok else '离线'} (通用网页抓取)"
         ]
         
@@ -3498,16 +3499,16 @@ with gr.Blocks(
     
     gr.HTML("""
     <div class="header-gradient">
-        <h1>🚀 VibeDoc Agent：AI驱动的智能开发助手</h1>
+        <h1>🚀 VibeDoc - AI-Powered Development Plan Generator</h1>
         <p style="font-size: 18px; margin: 15px 0; opacity: 0.95;">
-            🤖 60-180秒将创意转化为完整开发方案 + 专业编程提示词
+            🤖 Transform your ideas into comprehensive development plans in 60-180 seconds
         </p>
         <p style="opacity: 0.85;">
-            ✨ 集成 MCP 服务 | 🔗 支持外部知识 | 📊 可视化图表 | 🎯 一键复制使用
+            ✨ AI-Driven Planning | � Visual Diagrams | 🎯 Professional Output | � Multi-format Export
         </p>
         <div style="margin-top: 1rem; padding: 0.5rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem;">
             <small style="opacity: 0.9;">
-                🌟 MCP&Agent Challenge 2025 参赛作品 | 💡 集成魔塔 MCP 广场服务
+                🌟 Open Source Project | 💡 Built with Qwen2.5-72B-Instruct | ⚡ Fast & Reliable
             </small>
         </div>
     </div>
@@ -4045,91 +4046,91 @@ with gr.Blocks(
         </div>
         """)
         
-    # 示例区域 - 优化并添加真实deepwiki.org URL
-    gr.Markdown("## 🎯 快速开始", elem_id="quick_start_container")
+    # 示例区域 - 展示多样化的应用场景
+    gr.Markdown("## 🎯 Example Use Cases", elem_id="quick_start_container")
     gr.Examples(
         examples=[
             [
-                "AI驱动的智能客服系统：支持多轮对话、情感分析、知识库检索、自动工单生成和智能回复",
-                "https://deepwiki.org/openai/openai-python"
+                "AI-powered customer service system: Multi-turn dialogue, sentiment analysis, knowledge base search, automatic ticket generation, and intelligent responses",
+                "https://docs.python.org/3/library/asyncio.html"
             ],
             [
-                "基于React和TypeScript的现代Web应用：包含用户认证、实时数据同步、响应式设计、PWA支持",
-                "https://deepwiki.org/facebook/react"
+                "Modern web application with React and TypeScript: User authentication, real-time data sync, responsive design, PWA support, and offline capabilities",
+                "https://react.dev/learn"
             ],
             [
-                "区块链NFT艺术品交易平台：智能合约、元数据存储、拍卖机制、版权保护、社区治理",
-                "https://ethereum.org/en/developers/docs/"
+                "Task management platform: Team collaboration, project tracking, deadline reminders, file sharing, and progress visualization",
+                ""
             ],
             [
-                "智能健康管理App：运动追踪、饮食分析、健康报告、医生在线咨询、个性化建议",
-                "https://www.who.int/health-topics/physical-activity"
+                "E-commerce marketplace: Product catalog, shopping cart, payment integration, order management, and customer reviews",
+                "https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps"
             ],
             [
-                "Python机器学习工具库：数据预处理、模型训练、超参数调优、模型部署、可视化分析",
-                "https://deepwiki.org/scikit-learn/scikit-learn"
+                "Social media analytics dashboard: Data visualization, sentiment analysis, trend tracking, engagement metrics, and automated reporting",
+                ""
             ],
             [
-                "微服务架构电商平台：服务发现、负载均衡、分布式事务、缓存策略、监控告警",
-                "https://github.com/microsoft/vscode"
+                "Educational learning management system: Course creation, student enrollment, progress tracking, assessments, and certificates",
+                "https://www.w3.org/WAI/WCAG21/quickref/"
             ]
         ],
         inputs=[idea_input, reference_url_input],
-        label="🎯 智能示例 - 体验MCP服务增强",
+        label="🎯 Popular Examples - Try These Ideas",
         examples_per_page=6,
         elem_id="enhanced_examples"
     )
     
-    # 使用说明 - 异步MCP服务 + 魔塔平台优化
+    # 使用说明 - 功能介绍
     gr.HTML("""
     <div class="prompts-section" id="ai_helper_instructions">
-        <h3>🚀 魔塔 MCP 异步服务 - 完全可用</h3>
+        <h3>🚀 How It Works - Intelligent Development Planning</h3>
         
-        <!-- 主要服务：Fetch MCP -->
+        <!-- 核心功能 -->
         <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #e8f5e8 0%, #f0fff4 100%); border-radius: 15px; border: 3px solid #28a745; margin: 15px 0;">
-            <span style="font-size: 36px;">🕷️</span><br>
-            <strong style="font-size: 18px; color: #155724;">Fetch MCP (主力服务)</strong><br>
+            <span style="font-size: 36px;">🧠</span><br>
+            <strong style="font-size: 18px; color: #155724;">AI-Powered Analysis</strong><br>
             <small style="color: #155724; font-weight: 600; font-size: 13px;">
-                🌐 支持所有网站 • ⚡ 异步处理 • ✅ 完全可用
+                � Intelligent planning • ⚡ Fast generation • ✅ Professional output
             </small>
         </div>
         
-        <!-- 特殊服务：DeepWiki MCP -->
+        <!-- 可视化支持 -->
         <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #e3f2fd 0%, #f0f8ff 100%); border-radius: 12px; border: 2px solid #2196f3; margin: 15px 0;">
-            <span style="font-size: 30px;">📖</span><br>
-            <strong style="font-size: 16px; color: #1976d2;">DeepWiki MCP (专用服务)</strong><br>
+            <span style="font-size: 30px;">�</span><br>
+            <strong style="font-size: 16px; color: #1976d2;">Visual Diagrams</strong><br>
             <small style="color: #1976d2; font-weight: 600; font-size: 12px;">
-                🔒 仅限 deepwiki.org • 📚 深度解析 • ⚡ 异步处理
+                🎨 Architecture • � Flowcharts • 📅 Gantt charts
             </small>
         </div>
         
-        <!-- 异步处理流程说明 -->
+        <!-- 处理流程说明 -->
         <div style="background: linear-gradient(135deg, #fff3e0 0%, #fffaf0 100%); padding: 15px; border-radius: 10px; margin: 15px 0; border-left: 4px solid #ff9800;">
-            <strong style="color: #f57c00;">⚡ 异步处理流程:</strong>
+            <strong style="color: #f57c00;">⚡ Processing Pipeline:</strong>
             <ol style="margin: 10px 0; padding-left: 20px; font-size: 14px;">
-                <li><strong>建立连接</strong> → SSE连接到魔塔MCP服务</li>
-                <li><strong>发送请求</strong> → HTTP 202 异步接收</li>
-                <li><strong>监听结果</strong> → SSE流实时获取响应</li>
-                <li><strong>智能选择</strong> → deepwiki.org用专用服务，其他用通用服务</li>
-                <li><strong>自动降级</strong> → 失败时切换服务，确保成功</li>
+                <li><strong>Input Analysis</strong> → Understanding your requirements</li>
+                <li><strong>Prompt Optimization</strong> → Enhancing description quality</li>
+                <li><strong>Knowledge Retrieval</strong> → Fetching relevant information</li>
+                <li><strong>AI Generation</strong> → Creating comprehensive plan</li>
+                <li><strong>Quality Validation</strong> → Ensuring professional output</li>
             </ol>
         </div>
         
-        <!-- 魔塔平台优化说明 -->
+        <!-- 核心优势 -->
         <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin: 15px 0; border-left: 4px solid #6c757d;">
-            <strong style="color: #495057;">🎯 魔塔平台优化:</strong>
+            <strong style="color: #495057;">🎯 Key Advantages:</strong>
             <ul style="margin: 10px 0; padding-left: 20px; font-size: 14px;">
-                <li><strong>零配置部署</strong> → 硬编码服务URL，直接运行</li>
-                <li><strong>异步处理</strong> → 支持HTTP 202 + SSE流</li>
-                <li><strong>智能重试</strong> → 自动处理网络波动</li>
-                <li><strong>性能优化</strong> → 并发处理，响应迅速</li>
+                <li><strong>Speed</strong> → 60-180 seconds generation time</li>
+                <li><strong>Quality</strong> → Professional industry-standard output</li>
+                <li><strong>Flexibility</strong> → Multiple export formats</li>
+                <li><strong>Integration</strong> → Works with all AI coding assistants</li>
             </ul>
         </div>
         
-        <h4>🤖 AI 编程工具完美支持</h4>
+        <h4>🤖 Perfect for AI Coding Assistants</h4>
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 12px 0;">
             <div style="text-align: center; padding: 8px; background: #e3f2fd; border-radius: 6px; border: 1px solid #2196f3; box-shadow: 0 2px 4px rgba(33,150,243,0.2);">
-                <span style="font-size: 16px;">🔵</span> <strong style="font-size: 12px;">Claude Code</strong>
+                <span style="font-size: 16px;">🔵</span> <strong style="font-size: 12px;">Claude</strong>
             </div>
             <div style="text-align: center; padding: 8px; background: #e8f5e8; border-radius: 6px; border: 1px solid #4caf50; box-shadow: 0 2px 4px rgba(76,175,80,0.2);">
                 <span style="font-size: 16px;">🟢</span> <strong style="font-size: 12px;">GitHub Copilot</strong>
@@ -4138,11 +4139,11 @@ with gr.Blocks(
                 <span style="font-size: 16px;">🟡</span> <strong style="font-size: 12px;">ChatGPT</strong>
             </div>
             <div style="text-align: center; padding: 8px; background: #fce4ec; border-radius: 6px; border: 1px solid #e91e63; box-shadow: 0 2px 4px rgba(233,30,99,0.2);">
-                <span style="font-size: 16px;">🔴</span> <strong style="font-size: 12px;">其他AI工具</strong>
+                <span style="font-size: 16px;">🔴</span> <strong style="font-size: 12px;">Cursor</strong>
             </div>
         </div>
         <p style="text-align: center; color: #28a745; font-weight: 700; font-size: 15px; background: #d4edda; padding: 8px; border-radius: 8px; border: 1px solid #c3e6cb;">
-            <em>🎉 魔塔异步MCP + AI生成 = 完美部署方案</em>
+            <em>🎉 Professional Development Plans + Ready-to-Use AI Prompts</em>
         </p>
     </div>
     """)
@@ -4263,11 +4264,12 @@ with gr.Blocks(
         }"""
     )
 
-# 启动应用 - Agent应用模式
+# 启动应用 - 开源版本
 if __name__ == "__main__":
-    logger.info("🚀 启动VibeDoc Agent应用")
-    logger.info(f"🌍 运行环境: {config.environment}")
-    logger.info(f"🔧 启用的MCP服务: {[s.name for s in config.get_enabled_mcp_services()]}")
+    logger.info("🚀 Starting VibeDoc Application")
+    logger.info(f"🌍 Environment: {config.environment}")
+    logger.info(f"� Version: 2.0.0 - Open Source Edition")
+    logger.info(f"�🔧 External Services: {[s.name for s in config.get_enabled_mcp_services()]}")
     
     # 尝试多个端口以避免冲突
     ports_to_try = [7860, 7861, 7862, 7863, 7864]
@@ -4275,20 +4277,23 @@ if __name__ == "__main__":
     
     for port in ports_to_try:
         try:
-            logger.info(f"🌐 尝试启动应用在端口: {port}")
+            logger.info(f"🌐 Attempting to launch on port: {port}")
             demo.launch(
                 server_name="0.0.0.0",
                 server_port=port,
-                share=True,
+                share=False,  # 开源版本默认不分享
                 show_error=config.debug,
                 prevent_thread_lock=False
             )
             launched = True
+            logger.info(f"✅ Application successfully launched on port {port}")
+            logger.info(f"🔗 Local URL: http://localhost:{port}")
+            logger.info(f"🔗 Network URL: http://0.0.0.0:{port}")
             break
         except Exception as e:
-            logger.warning(f"⚠️ 端口 {port} 启动失败: {str(e)}")
+            logger.warning(f"⚠️ Port {port} failed: {str(e)}")
             continue
     
     if not launched:
-        logger.error("❌ 所有端口都无法启动应用，请检查网络配置")
+        logger.error("❌ Failed to launch on all ports. Please check network configuration.")
     
