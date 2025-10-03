@@ -73,6 +73,81 @@ One-click export for different scenarios:
 
 ![Generated Example](./image/2.png)
 
+## 💡 Real-World Example
+
+### Input Idea
+```
+Develop an AR sign language translation app that can translate sign language
+into voice and text in real-time, and also translate voice and text into
+sign language gestures displayed in AR
+```
+
+### Generated Output
+
+**📄 [View Complete Development Plan](./HandVoice_Development_Plan.md)** (10,000+ words)
+
+The AI-generated plan includes:
+
+#### 1. **Product Overview**
+- Target users (deaf community, healthcare workers, educators)
+- Core features (real-time translation, multi-language support, AR visualization)
+- Market positioning and competitive analysis
+
+#### 2. **Technical Architecture**
+Complete system architecture with Mermaid diagrams showing:
+- User interface components
+- Backend services
+- ML model integration
+- Database design
+- AR rendering pipeline
+
+#### 3. **Technology Stack**
+- **Frontend**: React Native (cross-platform)
+- **Backend**: Node.js + Express
+- **ML Models**: TensorFlow for sign language recognition
+- **NLP**: spaCy for natural language processing
+- **AR**: ARKit (iOS) / ARCore (Android)
+- **Database**: MongoDB
+
+#### 4. **Development Timeline**
+6-month plan with 3 major milestones:
+- **Month 1-2**: Core recognition & translation engine
+- **Month 3-4**: AR integration & UI development
+- **Month 5-6**: Testing, optimization & deployment
+
+#### 5. **12+ AI Coding Prompts**
+Ready-to-use prompts for each module. Example:
+
+```
+Feature: Hand Gesture Recognition Model
+
+Context:
+Building a real-time hand gesture recognition system for sign language translation.
+Need to detect and classify hand positions, movements, and facial expressions.
+
+Requirements:
+- Process video frames at 30+ FPS
+- Recognize 500+ sign language gestures
+- Support continuous gesture sequences
+- Handle varying lighting conditions
+
+Tech Stack:
+- TensorFlow/Keras for model training
+- MediaPipe for hand landmark detection
+- OpenCV for image preprocessing
+
+Constraints:
+- Must run on mobile devices (iOS/Android)
+- Model size < 50MB for mobile deployment
+- Inference time < 100ms per frame
+
+Expected Output:
+- Model architecture code
+- Training pipeline
+- Data preprocessing functions
+- Mobile optimization strategies
+```
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -140,38 +215,6 @@ docker run -p 7860:7860 \
   -e SILICONFLOW_API_KEY=your_key \
   vibedoc
 ```
-
-## 💡 Usage Examples
-
-### Example 1: Web Application
-
-**Input:**
-```
-Develop an online collaborative document editor with real-time
-multi-user editing, version management, and commenting features,
-similar to Google Docs
-```
-
-**Generated Output:**
-- Complete tech stack (React + Node.js + WebSocket)
-- 6-month development roadmap with 3 milestones
-- 10+ ready-to-use AI coding prompts
-- Architecture diagrams, flowcharts, Gantt charts
-
-### Example 2: AI Application
-
-**Input:**
-```
-Intelligent customer service system: multi-turn dialogue,
-sentiment analysis, knowledge base search, automatic ticket
-generation, smart reply recommendations
-```
-
-**Output:**
-- LLM-based dialogue system architecture
-- Knowledge base construction and retrieval solution
-- Sentiment analysis model integration
-- Complete implementation roadmap
 
 ## 🏗️ Technical Architecture
 

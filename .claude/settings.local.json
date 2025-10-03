@@ -26,7 +26,9 @@
       "Bash(git commit -m \"🚀 Transform to genuine open-source project\n\nMajor Changes:\n- ✨ Remove all challenge-related content\n- 📝 Create English README.md as main documentation  \n- 🌐 Add Chinese README.zh.md for Chinese users\n- 🎯 Optimize project positioning as AI development tool\n- 📖 Add comprehensive CLAUDE.md for developers\n- 🗑️ Clean up challenge submission documents\n- 🖼️ Add project screenshots and examples\n- 📄 Add GitHub issue submission template\n\nFocus: Genuine open-source product for real user needs\n\n🤖 Generated with Claude Code (https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\")",
       "Bash(python3 -m py_compile /mnt/d/Fixed_program/Vibedocs/app.py)",
       "Bash(git checkout app.py)",
-      "Bash(python3 -c \"from app import generate_development_plan; print(''✅ Import successful'')\")"
+      "Bash(python3 -c \"from app import generate_development_plan; print(''✅ Import successful'')\")",
+      "Bash(git commit -m \"Clean up repository and optimize READMEs\n\n- Remove unnecessary files (test files, submission docs, unused modules)\n- Update README title: VibeDoc: Your AI Product Manager & Architect\n- Create separate Chinese README.zh.md\n- Remove plan_editor dependency (feature disabled)\n- Keep only essential documentation files\n- Optimize project structure for open source\n\n🤖 Generated with Claude Code (https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\")",
+      "Bash(git commit -m \"Add comprehensive README with real example showcase\n\n- Recover HandVoice_Development_Plan.md as example\n- Add detailed Real-World Example section to README\n- Showcase complete generation output with diagrams\n- Include actual AI coding prompt example\n- Update title: VibeDoc: Your AI Product Manager & Architect\n\n🤖 Generated with Claude Code (https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\")"
     ],
     "deny": [],
     "ask": []
