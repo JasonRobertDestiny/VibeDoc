@@ -11,7 +11,7 @@
 
 AI-powered Product Manager & Software Architect that generates technical documentation, architecture diagrams, and AI coding prompts
 
-[🎬 Demo Video](https://www.bilibili.com/video/BV1ieagzQEAC/) | [🤝 Contributing](./CONTRIBUTING.md) | [💬 Discussions](https://github.com/JasonRobertDestiny/VibeDoc/discussions) | [中文文档](./README.zh.md)
+[🌐 Online Demo](https://modelscope.cn/studios/JasonRobert/Vibedocs) | [🎬 Demo Video](https://www.bilibili.com/video/BV1ieagzQEAC/) | [🤝 Contributing](./CONTRIBUTING.md) | [💬 Discussions](https://github.com/JasonRobertDestiny/VibeDoc/discussions) | [中文文档](./README.zh.md)
 
 </div>
 
@@ -150,13 +150,26 @@ Expected Output:
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### 🌐 Online Demo (Recommended)
+
+**👉 [Try VibeDoc Now](https://modelscope.cn/studios/JasonRobert/Vibedocs)** - No installation required!
+
+Experience the full functionality:
+1. Enter your product idea (e.g., "Build a smart fitness app")
+2. Optionally add reference URLs for context
+3. Click generate and wait 60-180 seconds
+4. Get complete development plan with AI coding prompts
+5. Export to Markdown/Word/PDF/HTML formats
+
+### 💻 Local Installation
+
+#### Prerequisites
 
 - Python 3.11+
 - pip package manager
 - [SiliconFlow API Key](https://siliconflow.cn) (free to obtain)
 
-### Installation
+#### Installation Steps
 
 ```bash
 # 1. Clone the repository

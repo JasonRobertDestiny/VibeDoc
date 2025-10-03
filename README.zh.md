@@ -11,7 +11,7 @@
 
 您的随身AI产品经理与架构师，智能生成技术文档、架构图表和AI编程提示词
 
-[🎬 演示视频](https://www.bilibili.com/video/BV1ieagzQEAC/) | [🤝 参与贡献](./CONTRIBUTING.md) | [💬 讨论社区](https://github.com/JasonRobertDestiny/VibeDoc/discussions) | [English](./README.md)
+[🌐 在线体验](https://modelscope.cn/studios/JasonRobert/Vibedocs) | [🎬 演示视频](https://www.bilibili.com/video/BV1ieagzQEAC/) | [🤝 参与贡献](./CONTRIBUTING.md) | [💬 讨论社区](https://github.com/JasonRobertDestiny/VibeDoc/discussions) | [English](./README.md)
 
 </div>
 
@@ -149,13 +149,26 @@ AI生成的完整方案包括：
 
 ## 🚀 快速开始
 
-### 环境要求
+### 🌐 在线体验（推荐）
+
+**👉 [立即体验 VibeDoc](https://modelscope.cn/studios/JasonRobert/Vibedocs)** - 无需安装，打开即用！
+
+体验完整功能：
+1. 输入您的产品创意（例如："开发一个智能健身APP"）
+2. 可选填写参考链接（帮助AI获取更多上下文）
+3. 点击生成，等待60-180秒
+4. 查看完整开发方案和AI编程提示词
+5. 一键导出为Markdown/Word/PDF/HTML格式
+
+### 💻 本地部署
+
+#### 环境要求
 
 - Python 3.11+
 - pip 包管理器
 - [SiliconFlow API Key](https://siliconflow.cn) (免费获取)
 
-### 安装步骤
+#### 安装步骤
 
 ```bash
 # 1. 克隆项目
