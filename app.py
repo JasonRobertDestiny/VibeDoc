@@ -16,7 +16,7 @@ from config import config
 from export_manager import export_manager
 from prompt_optimizer import prompt_optimizer
 from explanation_manager import explanation_manager, ProcessingStage
-from plan_editor import plan_editor
+# from plan_editor import plan_editor  # Removed - editing feature disabled
 
 # 配置日志
 logging.basicConfig(
