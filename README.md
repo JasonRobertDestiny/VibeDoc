@@ -317,6 +317,18 @@ We welcome all contributions:
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 
+## 💬 Join Community
+
+Join the VibeDoc community to share experiences, get support, and discuss ideas!
+
+<div align="center">
+<img src="./image/discussion_group.jpg" width="300" alt="VibeDoc Community QR Code">
+
+**Scan to Join VibeDoc Community**
+
+Share Experiences | Get Support | Join Discussions
+</div>
+
 ## 📝 Documentation
 
 - [User Guide](./USER_GUIDE.md) - Detailed instructions

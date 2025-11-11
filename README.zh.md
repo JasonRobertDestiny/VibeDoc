@@ -316,6 +316,18 @@ VibeDoc 采用模块化架构设计：
 
 详细指南请查看 [CONTRIBUTING.md](./CONTRIBUTING.md)
 
+## 💬 加入社区
+
+欢迎加入 VibeDoc 交流群，与其他用户和开发者交流经验、分享创意！
+
+<div align="center">
+<img src="./image/discussion_group.jpg" width="300" alt="VibeDoc交流群二维码">
+
+**扫码加入 VibeDoc 交流群**
+
+分享使用经验 | 获取技术支持 | 参与产品讨论
+</div>
+
 ## 📝 开发文档
 
 - [用户指南](./USER_GUIDE.md) - 详细使用说明
