@@ -321,7 +321,7 @@ VibeDoc 采用模块化架构设计：
 欢迎加入 VibeDoc 交流群，与其他用户和开发者交流经验、分享创意！
 
 <div align="center">
-<img src="./image/discussion_group.jpg" width="300" alt="VibeDoc交流群二维码">
+<img src="./image/discussion_group.png" width="300" alt="VibeDoc交流群二维码">
 
 **扫码加入 VibeDoc 交流群**
 
