@@ -322,7 +322,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 Join the VibeDoc community to share experiences, get support, and discuss ideas!
 
 <div align="center">
-<img src="./image/discussion_group.png" width="300" alt="VibeDoc Community QR Code">
+<img src="./image/discussion_group.jpg" width="300" alt="VibeDoc Community QR Code">
 
 **Scan to Join VibeDoc Community**
 
